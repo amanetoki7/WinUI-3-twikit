@@ -16,7 +16,7 @@
   <mp:PhoneIdentity PhoneProductId="bbdad4c0-d7a6-498c-a3d3-1f510db699ff" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
-    <DisplayName>App2 (Package)</DisplayName>
+    <DisplayName>WinUI3Twikit (Package)</DisplayName>
     <PublisherDisplayName>user</PublisherDisplayName>
     <Logo>Images\StoreLogo.png</Logo>
   </Properties>

@@ -38,7 +38,7 @@ WinUI 3 で動作する X（旧 Twitter）クライアントです。フロン�
 ```mermaid
 flowchart LR
     subgraph winui [WinUI3_Frontend]
-        App[App2.exe]
+        App[WinUI3Twikit.exe]
         Settings[SettingsPage]
     end
     subgraph local [LocalMachine]
@@ -112,9 +112,9 @@ WinUI-3-twikit/
 │   ├── post_tweet.py
 │   └── twikit_test_load_cookies.py
 ├── frontend/
-│   ├── App2.slnx           # Visual Studio ソリューション
-│   ├── App2/               # WinUI 3 アプリ本体
-│   └── App2 (Package)/     # MSIX パッケージ
+│   ├── WinUI3Twikit.slnx           # Visual Studio ソリューション
+│   ├── WinUI3Twikit/               # WinUI 3 アプリ本体
+│   └── WinUI3Twikit (Package)/     # MSIX パッケージ
 ├── data/
 │   └── cookies.example.json  # 認証情報テンプレート
 ├── static/                 # favicon 等
@@ -183,17 +183,17 @@ copy data\cookies.example.json data\cookies.json
 
 ### 方法 A: Visual Studio（推奨）
 
-1. [frontend/App2/App2.slnx](frontend/App2/App2.slnx) を Visual Studio 2022 以降で開く
-2. スタートアッププロジェクトを **App2 (Package)** に設定
+1. [frontend/WinUI3Twikit/WinUI3Twikit.slnx](frontend/WinUI3Twikit/WinUI3Twikit.slnx) を Visual Studio 2022 以降で開く
+2. スタートアッププロジェクトを **WinUI3Twikit (Package)** に設定
 3. プラットフォーム **x64**、構成 **Debug** で実行
 
 ### 方法 B: コマンドライン
 
 ```powershell
-dotnet build frontend\App2\App2\App2.csproj -c Debug -p:Platform=x64
+dotnet build frontend\WinUI3Twikit\WinUI3Twikit\WinUI3Twikit.csproj -c Debug -p:Platform=x64
 ```
 
-ビルド後、Visual Studio から実行するか、生成された `App2.exe` を起動します。
+ビルド後、Visual Studio から実行するか、生成された `WinUI3Twikit.exe` を起動します。
 
 ### 起動時の挙動
 
@@ -238,6 +238,6 @@ python -m uvicorn backend.api:app --host 127.0.0.1 --port 8000
 - X のアカウント表示情報は `X_SCREEN_NAME`、`X_DISPLAY_NAME`、`X_PROFILE_IMAGE_URL` で指定できます。個人のアカウント名や画像 URL はソースコードへ埋め込まないでください。
 - Python バックエンドはリポジトリルートから `python -m uvicorn backend.api:app --host 127.0.0.1 --port 8000` で起動できます
 - WinUI 3 からリポジトリを検出できない場合は、環境変数 `WINUI3TWIKIT_ROOT` にリポジトリルートを指定してください
-- フロントエンドは Windows App SDK 2.2 / .NET 8 を使用（[frontend/App2/App2.csproj](frontend/App2/App2.csproj)）
+- フロントエンドは Windows App SDK 2.2 / .NET 8 を使用（[frontend/WinUI3Twikit/WinUI3Twikit.csproj](frontend/WinUI3Twikit/WinUI3Twikit.csproj)）
 - フロントエンドの主な追加コンポーネント: `ListsPage`、`TweetActionHandler`、`Controls/QuotedTweetCard`、`Controls/TweetUserRow`
 - タイムライン・検索・リストのツイートデータは `tweet_serializer.py` で統一フォーマットに変換しています

@@ -1,5 +1,5 @@
-# Sync source changes from the local App2 dev folder into this GitHub-layout repo.
-# App2 is read-only; only files under this repo are modified.
+# Sync source changes from the local WinUI3Twikit dev folder into this GitHub-layout repo.
+# WinUI3Twikit is read-only; only files under this repo are modified.
 
 param(
     [Parameter(Mandatory = $true)]
@@ -75,42 +75,42 @@ foreach ($file in $scriptFiles) {
     }
 }
 
-# frontend App2 project
-$frontendSrc = Join-Path $SourceRoot "App2\App2"
-$frontendDst = Join-Path $DestRoot "frontend\App2\App2"
+# frontend WinUI3Twikit project
+$frontendSrc = Join-Path $SourceRoot "WinUI3Twikit\WinUI3Twikit"
+$frontendDst = Join-Path $DestRoot "frontend\WinUI3Twikit\WinUI3Twikit"
 $frontendSkip = @("ServerManager.cs", "RepositoryPaths.cs", "SettingsPage.xaml.cs")
 if (Test-Path $frontendSrc) {
     Get-ChildItem -LiteralPath $frontendSrc -Force | ForEach-Object {
         if ($frontendSkip -contains $_.Name) {
-            Write-Host "Skipped frontend/App2/$($_.Name)"
+            Write-Host "Skipped frontend/WinUI3Twikit/$($_.Name)"
             return
         }
         if ($_.PSIsContainer) {
             if ($exclude -contains $_.Name) { return }
             Copy-TreeFiltered -Source $_.FullName -Destination (Join-Path $frontendDst $_.Name) -ExcludeNames $exclude
-            Write-Host "Copied frontend/App2/$($_.Name)/"
+            Write-Host "Copied frontend/WinUI3Twikit/$($_.Name)/"
         }
         else {
             Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $frontendDst $_.Name) -Force
-            Write-Host "Copied frontend/App2/$($_.Name)"
+            Write-Host "Copied frontend/WinUI3Twikit/$($_.Name)"
         }
     }
 }
 
 # frontend package project (images/manifest only; skip build output)
-$packageSrc = Join-Path $SourceRoot "App2\App2 (Package)"
-$packageDst = Join-Path $DestRoot "frontend\App2\App2 (Package)"
+$packageSrc = Join-Path $SourceRoot "WinUI3Twikit\WinUI3Twikit (Package)"
+$packageDst = Join-Path $DestRoot "frontend\WinUI3Twikit\WinUI3Twikit (Package)"
 if (Test-Path $packageSrc) {
     Copy-TreeFiltered -Source $packageSrc -Destination $packageDst -ExcludeNames $exclude
-    Write-Host "Copied frontend/App2 (Package)/"
+    Write-Host "Copied frontend/WinUI3Twikit (Package)/"
 }
 
 # solution file
-$slnxSrc = Join-Path $SourceRoot "App2.slnx"
-$slnxDst = Join-Path $DestRoot "frontend\App2\App2.slnx"
+$slnxSrc = Join-Path $SourceRoot "WinUI3Twikit.slnx"
+$slnxDst = Join-Path $DestRoot "frontend\WinUI3Twikit\WinUI3Twikit.slnx"
 if (Test-Path $slnxSrc) {
     Copy-Item -LiteralPath $slnxSrc -Destination $slnxDst -Force
-    Write-Host "Copied frontend/App2.slnx"
+    Write-Host "Copied frontend/WinUI3Twikit.slnx"
 }
 
 # post-copy fixes for GitHub layout
@@ -123,11 +123,11 @@ if (Test-Path $actionQueuePath) {
 }
 
 # Remove legacy single-file code-behind if the xaml.cs version exists
-$legacyTimeline = Join-Path $DestRoot "frontend\App2\TimelinePage.cs"
-$timelineXamlCs = Join-Path $DestRoot "frontend\App2\TimelinePage.xaml.cs"
+$legacyTimeline = Join-Path $DestRoot "frontend\WinUI3Twikit\TimelinePage.cs"
+$timelineXamlCs = Join-Path $DestRoot "frontend\WinUI3Twikit\TimelinePage.xaml.cs"
 if ((Test-Path $legacyTimeline) -and (Test-Path $timelineXamlCs)) {
     Remove-Item -LiteralPath $legacyTimeline -Force
-    Write-Host "Removed frontend/App2/TimelinePage.cs (superseded by TimelinePage.xaml.cs)"
+    Write-Host "Removed frontend/WinUI3Twikit/TimelinePage.cs (superseded by TimelinePage.xaml.cs)"
 }
 
 Write-Host "Sync complete."
