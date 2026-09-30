@@ -1,26 +1,13 @@
-from twikit_client import client, login
-import os
-from fastapi import UploadFile
-from typing import List
+import argparse
+import asyncio
+
+from backend.post_tweet import tweeting_with_media
 
 
-async def tweeting_with_media(text: str, files: List[UploadFile] = None):
-    login()
+parser = argparse.ArgumentParser()
+parser.add_argument("text")
+parser.add_argument("paths", nargs="*")
+args = parser.parse_args()
 
-    media_ids = []
-    if files:
-        for file in files:
-            if file.filename:  # 空ファイル防止
-                content = await file.read()
-                # 一時ファイルとして保存（twikitのupload_mediaがファイルパスを期待する場合）
-                temp_path = f"temp_{file.filename}"
-                with open(temp_path, "wb") as f:
-                    f.write(content)
-
-                media_id = await client.upload_media(temp_path)
-                media_ids.append(media_id)
-                os.remove(temp_path)  # 後片付け
-
-    tweet = await client.create_tweet(text=text, media_ids=media_ids)
-    print(f"投稿完了  ID: {tweet.id} (メディア: {len(media_ids)}件)")
-    return tweet.id
+if __name__ == "__main__":
+    print(asyncio.run(tweeting_with_media(args.text, args.paths)))

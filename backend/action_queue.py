@@ -3,8 +3,8 @@ import logging
 from dataclasses import dataclass
 from typing import Literal
 
-import get_timeline_twikit as gtt
-import twikit_client
+from . import get_timeline_twikit as gtt
+from . import twikit_client
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ class ActionQueue:
                 await asyncio.sleep(0.5)
 
     async def _execute(self, job: ActionJob) -> None:
-        await twikit_client.login()
+        twikit_client.login()
 
         match job.action:
             case "like":

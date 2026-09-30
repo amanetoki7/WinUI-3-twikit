@@ -1,0 +1,63 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>WinExe</OutputType>
+        <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+        <RootNamespace>WinUI3Twikit</RootNamespace>
+        <Platforms>x86;x64;ARM64</Platforms>
+        <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
+        <UseWinUI>true</UseWinUI>
+        <Nullable>enable</Nullable>
+        <AppxBundlePlatforms>x86;x64;arm64</AppxBundlePlatforms>
+
+        <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <NoWarn>NU1701</NoWarn>
+    </PropertyGroup>
+
+
+    <ItemGroup>
+      <Content Remove="TwitterIcon48.png" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Include="TwitterIcon48.ico" />
+    </ItemGroup>
+
+
+    <ItemGroup>
+        <Manifest Include="$(ApplicationManifest)" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="H.NotifyIcon.WinUI" Version="2.2.0" />
+        <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.1839" />
+        <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.2.0" />
+        <PackageReference Include="CommunityToolkit.WinUI.Notifications" Version="7.1.2" />
+    </ItemGroup>
+
+    <PropertyGroup Label="Globals">
+      <WebView2DispatchAdapterNamespace>WinUI 3  Twitter</WebView2DispatchAdapterNamespace>
+    </PropertyGroup>
+
+    <!-- Publish Properties -->
+    <PropertyGroup>
+        <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
+        <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
+
+        <!-- WinUI 3 は Trim と相性が悪いので無効化 -->
+        <PublishTrimmed>false</PublishTrimmed>
+
+        <!-- AOT も無効化 -->
+        <PublishAot>false</PublishAot>
+        <ApplicationIcon>TwitterIcon48.ico</ApplicationIcon>
+        <ApplicationManifest>app.manifest</ApplicationManifest>
+        <AssemblyName>WinUI 3  Twitter</AssemblyName>
+        <AssemblyTitle>WinUI 3  Twitter</AssemblyTitle>
+    </PropertyGroup>
+</Project>

@@ -9,6 +9,16 @@ def _normalize_text(text: str) -> str:
     return html.unescape(text)
 
 
+def _metric_count(value: Any) -> int:
+    if value in (None, ""):
+        return 0
+    try:
+        count = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return count if count > 0 else 0
+
+
 def _format_created_at(t) -> str:
     try:
         dt = t.created_at_datetime.astimezone(timezone(timedelta(hours=9)))
@@ -105,6 +115,10 @@ def _quote_to_dict(quoted) -> Dict[str, Any]:
         "user_screen_name": getattr(quoted.user, "screen_name", ""),
         "user_profile_image": getattr(quoted.user, "profile_image_url", "") or "",
         "user_protected": getattr(quoted.user, "protected", False),
+        "user_verified": bool(
+            getattr(quoted.user, "is_blue_verified", False)
+            or getattr(quoted.user, "verified", False)
+        ),
         "media_items": _extract_media(quoted),
         "is_unavailable": False,
     }
@@ -130,9 +144,14 @@ def tweet_to_dict(t) -> Dict[str, Any]:
         "user_screen_name": getattr(display.user, "screen_name", ""),
         "user_profile_image": getattr(display.user, "profile_image_url", "") or "",
         "user_protected": getattr(display.user, "protected", False),
+        "user_verified": bool(
+            getattr(display.user, "is_blue_verified", False)
+            or getattr(display.user, "verified", False)
+        ),
         "favorite_count": getattr(display, "favorite_count", 0),
         "retweet_count": getattr(display, "retweet_count", 0),
         "reply_count": getattr(display, "reply_count", 0),
+        "view_count": _metric_count(getattr(display, "view_count", None)),
         "media_items": _extract_media(display),
         "is_liked": display_legacy.get("favorited", False),
         "is_retweeted": display_legacy.get("retweeted", False),

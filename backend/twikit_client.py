@@ -1,15 +1,28 @@
 from twikit import Client
-import os
+from pathlib import Path
 
-from paths import get_cookies_file
+from .paths import cookies_path
+
+# ClientTransaction 互換パッチ（KEY_BYTE / /home 優先）。
+# パッチなし動作確認時は False。必要なら True に戻す。
+ENABLE_TRANSACTION_PATCH = False
+
+if ENABLE_TRANSACTION_PATCH:
+    # Must run before any Client.request (transaction id / KEY_BYTE scrape).
+    from . import twikit_transaction_patch
+
+    twikit_transaction_patch.apply()
+    print("twikit_transaction_patch: enabled")
+else:
+    print("twikit_transaction_patch: disabled")
 
 client = Client("ja-JP")
 
 
-async def login(cookies_file: str | None = None):
+def login(cookies_file: str | None = None):
     """中央集中ログイン関数"""
-    cookies_file = cookies_file or get_cookies_file()
-    if not os.path.exists(cookies_file):
+    cookies_file = cookies_file or str(cookies_path())
+    if not Path(cookies_file).exists():
         print("Cookiesファイルが見つかりません")
         return False
 

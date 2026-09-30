@@ -57,7 +57,7 @@ flowchart LR
     API -->|"twikit"| X
 ```
 
-- アプリ起動時に `backend/api.py` を自動起動（`ServerManager.cs` が `uvicorn api:app` を実行）
+- アプリ起動時に `backend/api.py` を自動起動（`ServerManager.cs` が `python -m uvicorn backend.api:app` を実行）
 - 認証情報は `data/cookies.json` に保存（フロントエンドの設定画面と Python バックエンドで共有）
 - 環境変数 `COOKIES_FILE` で cookie ファイルのパスを上書き可能
 - リポジトリルートは `RepositoryPaths.cs`（フロントエンド）と `backend/paths.py`（バックエンド）から自動検出
@@ -183,14 +183,14 @@ copy data\cookies.example.json data\cookies.json
 
 ### 方法 A: Visual Studio（推奨）
 
-1. [frontend/App2.slnx](frontend/App2.slnx) を Visual Studio 2022 以降で開く
+1. [frontend/App2/App2.slnx](frontend/App2/App2.slnx) を Visual Studio 2022 以降で開く
 2. スタートアッププロジェクトを **App2 (Package)** に設定
 3. プラットフォーム **x64**、構成 **Debug** で実行
 
 ### 方法 B: コマンドライン
 
 ```powershell
-dotnet build frontend\App2\App2.csproj -c Debug -p:Platform=x64
+dotnet build frontend\App2\App2\App2.csproj -c Debug -p:Platform=x64
 ```
 
 ビルド後、Visual Studio から実行するか、生成された `App2.exe` を起動します。
@@ -205,7 +205,7 @@ dotnet build frontend\App2\App2.csproj -c Debug -p:Platform=x64
 
 ```powershell
 cd backend
-uvicorn api:app --host 127.0.0.1 --port 8000
+python -m uvicorn backend.api:app --host 127.0.0.1 --port 8000
 ```
 
 ## トラブルシューティング
@@ -235,7 +235,9 @@ uvicorn api:app --host 127.0.0.1 --port 8000
 - 開発環境: Visual Studio 2026 + Python 3.12 + .NET 8 SDK で動作確認済み
 - twikit は必ず [https://github.com/yukari-557fd8/twikit](https://github.com/yukari-557fd8/twikit) を使用する（`requirements.txt` に Git URL で固定済み）
 - cookie ファイルのパスは環境変数 `COOKIES_FILE` で変更できます（デフォルト: `data/cookies.json`）
-- Python バックエンドの作業ディレクトリは `backend/` です。手動で uvicorn を起動する場合も `backend/` から実行してください
+- X のアカウント表示情報は `X_SCREEN_NAME`、`X_DISPLAY_NAME`、`X_PROFILE_IMAGE_URL` で指定できます。個人のアカウント名や画像 URL はソースコードへ埋め込まないでください。
+- Python バックエンドはリポジトリルートから `python -m uvicorn backend.api:app --host 127.0.0.1 --port 8000` で起動できます
+- WinUI 3 からリポジトリを検出できない場合は、環境変数 `WINUI3TWIKIT_ROOT` にリポジトリルートを指定してください
 - フロントエンドは Windows App SDK 2.2 / .NET 8 を使用（[frontend/App2/App2.csproj](frontend/App2/App2.csproj)）
 - フロントエンドの主な追加コンポーネント: `ListsPage`、`TweetActionHandler`、`Controls/QuotedTweetCard`、`Controls/TweetUserRow`
 - タイムライン・検索・リストのツイートデータは `tweet_serializer.py` で統一フォーマットに変換しています

@@ -1,0 +1,138 @@
+<Page
+    x:Class="WinUI3Twikit.MyProfilePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:WinUI3Twikit"
+    xmlns:controls="using:WinUI3Twikit.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <Page.Resources>
+        <local:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+        <local:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter" />
+        <local:StringToBitmapImageConverter x:Key="StringToBitmapImageConverter" />
+    </Page.Resources>
+
+    <Grid Padding="12">
+        <!-- 読み込み中 -->
+        <ProgressRing Width="60" Height="60"
+                      IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                      Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Center"/>
+
+        <!-- エラー -->
+        <TextBlock Text="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+                   Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                   FontSize="15"
+                   TextWrapping="WrapWholeWords"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   Margin="24"
+                   Visibility="{x:Bind ViewModel.HasError, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+        <!-- プロフィール Header + ツイート一覧（1 つの ListView で無限スクロール） -->
+        <ListView x:Name="TweetsListView"
+                  ItemsSource="{x:Bind ViewModel.Tweets, Mode=OneWay}"
+                  SelectionMode="None"
+                  Padding="8"
+                  controls:TweetCard.HostActions="{x:Bind ViewModel}"
+                  Visibility="{x:Bind ViewModel.IsContentVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+
+            <ListView.Resources>
+                <Style TargetType="ListViewHeaderItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                    <Setter Property="Padding" Value="0"/>
+                    <Setter Property="MinHeight" Value="0"/>
+                </Style>
+            </ListView.Resources>
+
+            <ListView.Header>
+                <Grid>
+                    <StackPanel Spacing="12" Margin="0,0,0,8"
+                                MaxWidth="1650"
+                                HorizontalAlignment="Center">
+
+                    <!-- バナー + アイコン -->
+                    <Grid Height="160">
+                        <Image Stretch="UniformToFill"
+                               Source="{x:Bind ViewModel.BannerImageUrl, Mode=OneWay, Converter={StaticResource StringToBitmapImageConverter}, ConverterParameter=2000}"/>
+                        <Border Background="{ThemeResource AcrylicBackgroundFillColorDefaultBrush}"
+                                VerticalAlignment="Bottom" Height="72" Opacity="0.85"/>
+                        <PersonPicture Width="104" Height="104"
+                                       Margin="20"
+                                       VerticalAlignment="Bottom"
+                                       ProfilePicture="{x:Bind ViewModel.ProfileImageUrl, Mode=OneWay, Converter={StaticResource StringToBitmapImageConverter}, ConverterParameter=208}"/>
+                    </Grid>
+
+                    <!-- 基本情報 -->
+                    <StackPanel Margin="16,0" Spacing="4">
+                        <TextBlock Text="{x:Bind ViewModel.DisplayName, Mode=OneWay}"
+                                   Style="{StaticResource TitleLargeTextBlockStyle}"/>
+                        <TextBlock Text="{x:Bind ViewModel.ScreenNameDisplay, Mode=OneWay}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   FontSize="16"/>
+                        <TextBlock Text="{x:Bind ViewModel.Bio, Mode=OneWay}"
+                                   TextWrapping="WrapWholeWords"
+                                   Margin="0,8,0,8"/>
+                    </StackPanel>
+
+                    <!-- 統計 -->
+                    <Grid Margin="16,0" ColumnSpacing="40" HorizontalAlignment="Left">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="{x:Bind ViewModel.TweetsCount, Mode=OneWay}"
+                                       FontWeight="SemiBold" FontSize="16"/>
+                            <TextBlock Text="ポスト"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="{x:Bind ViewModel.FollowingCount, Mode=OneWay}"
+                                       FontWeight="SemiBold" FontSize="16"/>
+                            <TextBlock Text="フォロー中"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="{x:Bind ViewModel.FollowersCount, Mode=OneWay}"
+                                       FontWeight="SemiBold" FontSize="16"/>
+                            <TextBlock Text="フォロワー"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <StackPanel Margin="16,4,16,12" Spacing="4">
+                        <TextBlock Text="{x:Bind ViewModel.LocationText, Mode=OneWay}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <TextBlock Text="{x:Bind ViewModel.WebsiteText, Mode=OneWay}"
+                                   Visibility="{x:Bind ViewModel.HasWebsite, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                        <TextBlock Text="{x:Bind ViewModel.JoinedText, Mode=OneWay}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </ListView.Header>
+
+            <ListView.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <ItemsStackPanel/>
+                </ItemsPanelTemplate>
+            </ListView.ItemsPanel>
+
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="local:TweetViewModel">
+                    <controls:TweetCard Tweet="{x:Bind}"/>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+    </Grid>
+</Page>

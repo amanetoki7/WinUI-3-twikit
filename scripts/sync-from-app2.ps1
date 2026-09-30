@@ -2,7 +2,8 @@
 # App2 is read-only; only files under this repo are modified.
 
 param(
-    [string]$SourceRoot = "$env:USERPROFILE\Documents\visual_studio\test_app_with_menu\App2",
+    [Parameter(Mandatory = $true)]
+    [string]$SourceRoot,
     [string]$DestRoot = (Split-Path $PSScriptRoot -Parent)
 )
 
@@ -76,7 +77,7 @@ foreach ($file in $scriptFiles) {
 
 # frontend App2 project
 $frontendSrc = Join-Path $SourceRoot "App2\App2"
-$frontendDst = Join-Path $DestRoot "frontend\App2"
+$frontendDst = Join-Path $DestRoot "frontend\App2\App2"
 $frontendSkip = @("ServerManager.cs", "RepositoryPaths.cs", "SettingsPage.xaml.cs")
 if (Test-Path $frontendSrc) {
     Get-ChildItem -LiteralPath $frontendSrc -Force | ForEach-Object {
@@ -98,7 +99,7 @@ if (Test-Path $frontendSrc) {
 
 # frontend package project (images/manifest only; skip build output)
 $packageSrc = Join-Path $SourceRoot "App2\App2 (Package)"
-$packageDst = Join-Path $DestRoot "frontend\App2 (Package)"
+$packageDst = Join-Path $DestRoot "frontend\App2\App2 (Package)"
 if (Test-Path $packageSrc) {
     Copy-TreeFiltered -Source $packageSrc -Destination $packageDst -ExcludeNames $exclude
     Write-Host "Copied frontend/App2 (Package)/"
@@ -106,7 +107,7 @@ if (Test-Path $packageSrc) {
 
 # solution file
 $slnxSrc = Join-Path $SourceRoot "App2.slnx"
-$slnxDst = Join-Path $DestRoot "frontend\App2.slnx"
+$slnxDst = Join-Path $DestRoot "frontend\App2\App2.slnx"
 if (Test-Path $slnxSrc) {
     Copy-Item -LiteralPath $slnxSrc -Destination $slnxDst -Force
     Write-Host "Copied frontend/App2.slnx"

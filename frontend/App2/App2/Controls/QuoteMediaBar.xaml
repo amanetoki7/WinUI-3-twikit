@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="WinUI3Twikit.Controls.QuoteMediaBar"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:WinUI3Twikit"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <StackPanel Spacing="8">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="📎 メディア追加"
+                    Click="OnAddMediaClick"
+                    IsEnabled="{Binding CanAddQuoteMedia}"/>
+            <TextBlock Text="{Binding QuoteMediaSummary}"
+                       VerticalAlignment="Center"
+                       FontSize="12"
+                       Foreground="Gray"/>
+        </StackPanel>
+        <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Disabled">
+            <ItemsControl ItemsSource="{Binding QuoteMediaFiles}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" Spacing="8"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Width="88" Height="88">
+                            <Border CornerRadius="8" Background="#1E1E1E" BorderBrush="#555" BorderThickness="1">
+                                <Image Source="{Binding Preview}" Stretch="UniformToFill"/>
+                            </Border>
+                            <Button Content="✕"
+                                    Background="#D0000000"
+                                    Foreground="White"
+                                    FontSize="12"
+                                    FontWeight="Bold"
+                                    Padding="6,2"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Top"
+                                    Margin="4"
+                                    Click="RemoveMedia_Click"
+                                    Tag="{Binding}"/>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </StackPanel>
+</UserControl>

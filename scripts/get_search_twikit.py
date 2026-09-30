@@ -1,61 +1,20 @@
-from twikit_client import client, login
-from typing import List, Dict
+import argparse
+import asyncio
+import json
 
-from tweet_serializer import tweet_to_dict
-
-last_search_cursor = None
-current_query = None
-seen_search_tweets = set()   # ← グローバルで永続的に重複防止
+from backend.get_search_twikit import search_tweets
 
 
-async def search_tweets(
-    query: str, count: int = 20, product: str = "Latest", cursor: str = None
-) -> List[Dict]:
-    global last_search_cursor, current_query, seen_search_tweets
+parser = argparse.ArgumentParser()
+parser.add_argument("query")
+parser.add_argument("--count", type=int, default=20)
+args = parser.parse_args()
 
-    login()
-
-    results: List[Dict] = []
-
-    try:
-        if current_query != query:
-            last_search_cursor = None
-            current_query = query
-            seen_search_tweets.clear()   # 新しいクエリではリセット
-            print(f"新しい検索クエリ: {query} → seenクリア")
-
-        print(f"検索取得中... query='{query}' cursor={'あり' if cursor or last_search_cursor else 'なし'}")
-
-        use_cursor = cursor or last_search_cursor
-        search_result = await client.search_tweet(
-            query, product=product, count=count, cursor=use_cursor
+if __name__ == "__main__":
+    print(
+        json.dumps(
+            asyncio.run(search_tweets(args.query, count=args.count)),
+            ensure_ascii=False,
+            indent=2,
         )
-
-        if not search_result or len(search_result) == 0:
-            print("これ以上検索結果はありません")
-            last_search_cursor = None
-            return results
-
-        print(f"  └─ 取得したツイート数: {len(search_result)}")
-
-        for t in search_result:
-            if t.id in seen_search_tweets:
-                continue
-            seen_search_tweets.add(t.id)
-
-            results.append(tweet_to_dict(t))
-
-        # カーソル更新
-        if hasattr(search_result, "next_cursor") and search_result.next_cursor:
-            last_search_cursor = search_result.next_cursor
-            print(f"next_cursor 更新: {last_search_cursor[:50]}...")
-        else:
-            last_search_cursor = None
-            print("これ以上結果なし")
-
-    except Exception as e:
-        print(f"検索エラー: {e}")
-        last_search_cursor = None
-
-    print(f"検索完了: {len(results)} 件")
-    return results
+    )
