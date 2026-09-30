@@ -146,6 +146,8 @@ namespace WinUI3Twikit
             {
                 Id = newTweetId,
                 Text = replyText,
+                UserName = AccountDefaults.DisplayName,
+                UserScreenName = AccountDefaults.ScreenName,
                 CreatedAt = TimeDisplayHelper.FormatNowForStorage(),
                 IsLiked = false,
                 IsRetweeted = false,
@@ -153,7 +155,12 @@ namespace WinUI3Twikit
                 FavoriteCount = 0,
                 RetweetCount = 0
             };
-            SessionAccount.CopyAuthorTo(replyVm);
+            try
+            {
+                replyVm.UserProfileImage = ImageCache.GetAvatar(
+                    AccountDefaults.ProfileImageUrl);
+            }
+            catch { }
 
             // 元のツイートの直後に挿入
             int index = SearchResults.IndexOf(originalVm);
@@ -176,6 +183,8 @@ namespace WinUI3Twikit
                 Id = newTweetId,
                 TimelineEntryId = newTweetId,
                 Text = quoteText,
+                UserName = AccountDefaults.DisplayName,
+                UserScreenName = AccountDefaults.ScreenName,
                 CreatedAt = TimeDisplayHelper.FormatNowForStorage(),
                 IsLiked = false,
                 IsRetweeted = false,
@@ -185,7 +194,12 @@ namespace WinUI3Twikit
                 QuotedTweet = originalVm.ToQuotedPreview(),
                 MediaItems = TweetViewModel.CreateMediaItemsFromAttachments(originalVm.QuoteMediaFiles),
             };
-            SessionAccount.CopyAuthorTo(quoteVm);
+            try
+            {
+                quoteVm.UserProfileImage = ImageCache.GetAvatar(
+                    "https://pbs.twimg.com/profile_images/1938605137813282816/u5D3g9W3_400x400.jpg");
+            }
+            catch { }
 
             TweetViewModel.FinalizeQuotedCardMedia(quoteVm);
 

@@ -70,15 +70,8 @@
 
                     <!-- 基本情報 -->
                     <StackPanel Margin="16,0" Spacing="4">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Text="{x:Bind ViewModel.DisplayName, Mode=OneWay}"
-                                       Style="{StaticResource TitleLargeTextBlockStyle}"/>
-                            <FontIcon Glyph="&#xE73E;"
-                                      FontSize="16"
-                                      VerticalAlignment="Center"
-                                      Foreground="#1D9BF0"
-                                      Visibility="{x:Bind ViewModel.IsVerified, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                        </StackPanel>
+                        <TextBlock Text="{x:Bind ViewModel.DisplayName, Mode=OneWay}"
+                                   Style="{StaticResource TitleLargeTextBlockStyle}"/>
                         <TextBlock Text="{x:Bind ViewModel.ScreenNameDisplay, Mode=OneWay}"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                    FontSize="16"/>

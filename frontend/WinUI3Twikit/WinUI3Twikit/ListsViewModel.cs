@@ -292,14 +292,17 @@ namespace WinUI3Twikit
             {
                 Id = newTweetId,
                 Text = replyText,
+                UserName = AccountDefaults.DisplayName,
+                UserScreenName = AccountDefaults.ScreenName,
                 CreatedAt = TimeDisplayHelper.FormatNowForStorage(),
                 IsLiked = false,
                 IsRetweeted = false,
                 ReplyCount = 0,
                 FavoriteCount = 0,
                 RetweetCount = 0,
+                UserProfileImage = ImageCache.GetAvatar(
+                    AccountDefaults.ProfileImageUrl)
             };
-            SessionAccount.CopyAuthorTo(replyVm);
 
             var index = Tweets.IndexOf(originalVm);
             if (index >= 0)
@@ -319,6 +322,8 @@ namespace WinUI3Twikit
                 Id = newTweetId,
                 TimelineEntryId = newTweetId,
                 Text = quoteText,
+                UserName = AccountDefaults.DisplayName,
+                UserScreenName = AccountDefaults.ScreenName,
                 CreatedAt = TimeDisplayHelper.FormatNowForStorage(),
                 IsLiked = false,
                 IsRetweeted = false,
@@ -327,8 +332,9 @@ namespace WinUI3Twikit
                 RetweetCount = 0,
                 QuotedTweet = originalVm.ToQuotedPreview(),
                 MediaItems = TweetViewModel.CreateMediaItemsFromAttachments(originalVm.QuoteMediaFiles),
+                UserProfileImage = ImageCache.GetAvatar(
+                    "https://pbs.twimg.com/profile_images/1938605137813282816/u5D3g9W3_400x400.jpg")
             };
-            SessionAccount.CopyAuthorTo(quoteVm);
             TweetViewModel.FinalizeQuotedCardMedia(quoteVm);
 
             var index = Tweets.IndexOf(originalVm);

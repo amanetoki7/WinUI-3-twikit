@@ -235,7 +235,7 @@ python -m uvicorn backend.api:app --host 127.0.0.1 --port 8000
 - 開発環境: Visual Studio 2026 + Python 3.12 + .NET 8 SDK で動作確認済み
 - twikit は必ず [https://github.com/yukari-557fd8/twikit](https://github.com/yukari-557fd8/twikit) を使用する（`requirements.txt` に Git URL で固定済み）
 - cookie ファイルのパスは環境変数 `COOKIES_FILE` で変更できます（デフォルト: `data/cookies.json`）
-- `/profile` は `account/settings.json` が返すログイン中の `screen_name` を `UserByScreenName` に渡して取得します。ユーザー名の定数は不要です。`Client.user()` が使う `UserByRestId` は Cloudflare に 403 で拒否されるため使いません。`X_DISPLAY_NAME`、`X_SCREEN_NAME`、`X_PROFILE_IMAGE_URL` は、プロフィール取得前の表示や取得できないデータの任意フォールバックとしてのみ使用できます。
+- X のアカウント表示情報は `X_SCREEN_NAME`、`X_DISPLAY_NAME`、`X_PROFILE_IMAGE_URL` で指定できます。個人のアカウント名や画像 URL はソースコードへ埋め込まないでください。
 - Python バックエンドはリポジトリルートから `python -m uvicorn backend.api:app --host 127.0.0.1 --port 8000` で起動できます
 - WinUI 3 からリポジトリを検出できない場合は、環境変数 `WINUI3TWIKIT_ROOT` にリポジトリルートを指定してください
 - フロントエンドは Windows App SDK 2.2 / .NET 8 を使用（[frontend/WinUI3Twikit/WinUI3Twikit.csproj](frontend/WinUI3Twikit/WinUI3Twikit.csproj)）

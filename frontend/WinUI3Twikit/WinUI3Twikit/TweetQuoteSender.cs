@@ -66,7 +66,6 @@ namespace WinUI3Twikit
                     if (result.TryGetProperty("new_tweet_id", out var newIdElement))
                     {
                         var newTweetId = newIdElement.GetString() ?? string.Empty;
-                        await SessionAccount.EnsureLoadedAsync();
                         addToTimeline(vm, newTweetId, quoteText);
                     }
 

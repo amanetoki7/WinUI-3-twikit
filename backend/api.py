@@ -186,7 +186,7 @@ async def get_profile():
 
 @app.get("/profile/tweets")
 async def get_profile_tweets(count: int = 20, cursor: str | None = None):
-    """自分のツイート一覧（settings の screen_name → get_user_tweets）。"""
+    """自分のツイート一覧（get_user_by_screen_name → get_user_tweets）。"""
     twikit_client.login()
     try:
         return await gmp.get_own_tweets(count=count, cursor=cursor)

@@ -1,33 +1,45 @@
+from .twikit_client import client, login
+from datetime import timezone, timedelta
 from typing import Dict, List, Optional
 
-from .get_user_profile_twikit import _user_to_profile_dict
-from .twikit_client import client, login
 from .tweet_serializer import tweet_to_dict
+import os
 
-
-async def _authenticated_user():
-    """ログイン中のユーザー。ユーザー名はコードに書かず、セッションから取る。
-
-    account/settings.json の screen_name を UserByScreenName に渡す。
-    Client.user() が続ける UserByRestId は Cloudflare に 403 で拒まれる。
-    """
-    response, _ = await client.v11.settings()
-    if not isinstance(response, dict):
-        raise RuntimeError("アカウント設定の応答が不正です")
-
-    screen_name = str(response.get("screen_name") or "").strip().lstrip("@")
-    if not screen_name:
-        raise RuntimeError("ログイン中ユーザー名を取得できませんでした")
-
-    return await client.get_user_by_screen_name(screen_name)
+# 自分のプロフィール用 screen_name（アプリ固定）
+MY_SCREEN_NAME = os.environ.get("X_SCREEN_NAME", "")
 
 
 async def get_own_profile():
     login()  # 中央集中ログインを使用
 
+    if not MY_SCREEN_NAME:
+        return {"error": "X_SCREEN_NAME is not configured"}
+
     try:
-        user = await _authenticated_user()
-        return _user_to_profile_dict(user)
+        user = await client.get_user_by_screen_name(MY_SCREEN_NAME)
+
+        created_str = "不明"
+        try:
+            if hasattr(user, "created_at_datetime") and user.created_at_datetime:
+                dt = user.created_at_datetime.astimezone(timezone(timedelta(hours=9)))
+                created_str = dt.strftime("%Y/%m/%d")
+        except Exception:
+            created_str = getattr(user, "created_at", "不明")
+
+        return {
+            "id": user.id,
+            "name": user.name,
+            "screen_name": user.screen_name,
+            "bio": user.description,
+            "followers_count": user.followers_count,
+            "following_count": user.following_count,
+            "location": getattr(user, "location", None),
+            "created_str": created_str,
+            "profile_image_url": user.profile_image_url,
+            "profile_banner_url": getattr(user, "profile_banner_url", None),
+            "statuses_count": user.statuses_count,
+            "favourites_count": user.favourites_count,
+        }
     except Exception as e:
         print(f"プロフィール取得エラー: {e}")
         return {"error": str(e)}
@@ -36,7 +48,7 @@ async def get_own_profile():
 async def get_own_tweets(
     count: int = 20, cursor: Optional[str] = None
 ) -> Dict:
-    """自分のツイート一覧。認証済みユーザーを解決してから取得する。"""
+    """自分のツイート一覧。client.get_user_by_screen_name でユーザーを解決してから取得する。"""
     login()
 
     results: List[Dict] = []
@@ -44,10 +56,10 @@ async def get_own_tweets(
 
     try:
         print(
-            f"自分のツイート取得中... count={count} "
-            f"cursor={'あり' if cursor else 'なし'}"
+            f"自分のツイート取得中... screen_name={MY_SCREEN_NAME} "
+            f"count={count} cursor={'あり' if cursor else 'なし'}"
         )
-        user = await _authenticated_user()
+        user = await client.get_user_by_screen_name(MY_SCREEN_NAME)
         timeline = await client.get_user_tweets(
             user.id, "Tweets", count=count, cursor=cursor
         )
