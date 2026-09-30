@@ -3,20 +3,13 @@ from datetime import timezone, timedelta
 from typing import Dict, List, Optional
 
 from .tweet_serializer import tweet_to_dict
-import os
-
-# 自分のプロフィール用 screen_name（アプリ固定）
-MY_SCREEN_NAME = os.environ.get("X_SCREEN_NAME", "")
 
 
 async def get_own_profile():
     login()  # 中央集中ログインを使用
 
-    if not MY_SCREEN_NAME:
-        return {"error": "X_SCREEN_NAME is not configured"}
-
     try:
-        user = await client.get_user_by_screen_name(MY_SCREEN_NAME)
+        user = await client.user()
 
         created_str = "不明"
         try:
@@ -48,7 +41,7 @@ async def get_own_profile():
 async def get_own_tweets(
     count: int = 20, cursor: Optional[str] = None
 ) -> Dict:
-    """自分のツイート一覧。client.get_user_by_screen_name でユーザーを解決してから取得する。"""
+    """自分のツイート一覧。認証済みユーザーを解決してから取得する。"""
     login()
 
     results: List[Dict] = []
@@ -56,10 +49,10 @@ async def get_own_tweets(
 
     try:
         print(
-            f"自分のツイート取得中... screen_name={MY_SCREEN_NAME} "
-            f"count={count} cursor={'あり' if cursor else 'なし'}"
+            f"自分のツイート取得中... count={count} "
+            f"cursor={'あり' if cursor else 'なし'}"
         )
-        user = await client.get_user_by_screen_name(MY_SCREEN_NAME)
+        user = await client.user()
         timeline = await client.get_user_tweets(
             user.id, "Tweets", count=count, cursor=cursor
         )
