@@ -34,6 +34,10 @@ def _user_to_profile_dict(user) -> Dict:
         "profile_banner_url": getattr(user, "profile_banner_url", None),
         "statuses_count": user.statuses_count,
         "favourites_count": getattr(user, "favourites_count", None),
+        "verified": bool(
+            getattr(user, "is_blue_verified", False)
+            or getattr(user, "verified", False)
+        ),
     }
 
 

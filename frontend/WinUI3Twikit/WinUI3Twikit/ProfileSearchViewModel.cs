@@ -38,6 +38,7 @@ namespace WinUI3Twikit
         private string _joinedText = string.Empty;
         private string? _profileImageUrl;
         private string? _bannerImageUrl;
+        private bool _isVerified;
         private string _errorMessage = string.Empty;
         private string _lastQuery = string.Empty;
 
@@ -245,6 +246,19 @@ namespace WinUI3Twikit
             }
         }
 
+        public bool IsVerified
+        {
+            get => _isVerified;
+            private set
+            {
+                if (_isVerified != value)
+                {
+                    _isVerified = value;
+                    OnPropertyChanged(nameof(IsVerified));
+                }
+            }
+        }
+
         public string ErrorMessage
         {
             get => _errorMessage;
@@ -362,6 +376,7 @@ namespace WinUI3Twikit
 
                 ProfileImageUrl = GetString(root, "profile_image_url");
                 BannerImageUrl = GetString(root, "profile_banner_url");
+                IsVerified = GetBool(root, "verified");
 
                 HasProfile = true;
                 HasError = false;
@@ -391,6 +406,7 @@ namespace WinUI3Twikit
             JoinedText = string.Empty;
             ProfileImageUrl = null;
             BannerImageUrl = null;
+            IsVerified = false;
         }
 
         public async Task LoadMoreTweetsAsync()
@@ -500,17 +516,14 @@ namespace WinUI3Twikit
             {
                 Id = newTweetId,
                 Text = replyText,
-                UserName = AccountDefaults.DisplayName,
-                UserScreenName = AccountDefaults.ScreenName,
                 CreatedAt = TimeDisplayHelper.FormatNowForStorage(),
                 IsLiked = false,
                 IsRetweeted = false,
                 ReplyCount = 0,
                 FavoriteCount = 0,
                 RetweetCount = 0,
-                UserProfileImage = ImageCache.GetAvatar(
-                    AccountDefaults.ProfileImageUrl)
             };
+            SessionAccount.CopyAuthorTo(replyVm);
 
             var index = Tweets.IndexOf(originalVm);
             if (index >= 0)
@@ -530,8 +543,6 @@ namespace WinUI3Twikit
                 Id = newTweetId,
                 TimelineEntryId = newTweetId,
                 Text = quoteText,
-                UserName = AccountDefaults.DisplayName,
-                UserScreenName = AccountDefaults.ScreenName,
                 CreatedAt = TimeDisplayHelper.FormatNowForStorage(),
                 IsLiked = false,
                 IsRetweeted = false,
@@ -540,9 +551,8 @@ namespace WinUI3Twikit
                 RetweetCount = 0,
                 QuotedTweet = originalVm.ToQuotedPreview(),
                 MediaItems = TweetViewModel.CreateMediaItemsFromAttachments(originalVm.QuoteMediaFiles),
-                UserProfileImage = ImageCache.GetAvatar(
-                    "https://pbs.twimg.com/profile_images/1938605137813282816/u5D3g9W3_400x400.jpg")
             };
+            SessionAccount.CopyAuthorTo(quoteVm);
             TweetViewModel.FinalizeQuotedCardMedia(quoteVm);
 
             var index = Tweets.IndexOf(originalVm);
@@ -586,6 +596,22 @@ namespace WinUI3Twikit
             }
 
             return el.ToString() ?? "0";
+        }
+
+        private static bool GetBool(JsonElement root, string name)
+        {
+            if (!root.TryGetProperty(name, out var el) || el.ValueKind == JsonValueKind.Null)
+            {
+                return false;
+            }
+
+            return el.ValueKind switch
+            {
+                JsonValueKind.True => true,
+                JsonValueKind.False => false,
+                JsonValueKind.String => bool.TryParse(el.GetString(), out var value) && value,
+                _ => false
+            };
         }
 
         private sealed class UserTweetsApiResponse

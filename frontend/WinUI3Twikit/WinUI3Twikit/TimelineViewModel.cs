@@ -577,17 +577,14 @@ namespace WinUI3Twikit
                 Id = newTweetId,
                 TimelineEntryId = newTweetId,
                 Text = replyText,
-                UserName = AccountDefaults.DisplayName,
-                UserScreenName = AccountDefaults.ScreenName,
                 CreatedAt = TimeDisplayHelper.FormatNowForStorage(),
                 IsLiked = false,
                 IsRetweeted = false,
                 ReplyCount = 0,
                 FavoriteCount = 0,
                 RetweetCount = 0,
-                UserProfileImage = ImageCache.GetAvatar(
-                    AccountDefaults.ProfileImageUrl)
             };
+            SessionAccount.CopyAuthorTo(replyVm);
 
             GetSeenSet().Add(replyVm.DedupKey);
             int index = Tweets.IndexOf(originalVm);
@@ -610,8 +607,6 @@ namespace WinUI3Twikit
                 Id = newTweetId,
                 TimelineEntryId = newTweetId,
                 Text = quoteText,
-                UserName = AccountDefaults.DisplayName,
-                UserScreenName = AccountDefaults.ScreenName,
                 CreatedAt = TimeDisplayHelper.FormatNowForStorage(),
                 IsLiked = false,
                 IsRetweeted = false,
@@ -620,9 +615,8 @@ namespace WinUI3Twikit
                 RetweetCount = 0,
                 QuotedTweet = originalVm.ToQuotedPreview(),
                 MediaItems = TweetViewModel.CreateMediaItemsFromAttachments(originalVm.QuoteMediaFiles),
-                UserProfileImage = ImageCache.GetAvatar(
-                    AccountDefaults.ProfileImageUrl)
             };
+            SessionAccount.CopyAuthorTo(quoteVm);
             TweetViewModel.FinalizeQuotedCardMedia(quoteVm);
 
             GetSeenSet().Add(quoteVm.DedupKey);
