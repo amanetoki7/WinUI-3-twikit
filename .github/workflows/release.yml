@@ -1,0 +1,112 @@
+# タグ（v1.2.3 など）を push すると、自己完結型の単一 exe を publish して GitHub Release に添付する。
+# 手動実行（workflow_dispatch）では Release を作らず、Artifacts に exe を置くだけ。
+#
+# ローカルで同じものを作るには（PowerShell、twikit-dotnet はこのリポジトリの隣に clone）:
+#   dotnet publish frontend\WinUI3Twikit\WinUI3Twikit\WinUI3Twikit.csproj -c Release -r win-x64 --self-contained true `
+#     -p:Platform=x64 -p:PublishSingleFile=true -o publish\win-x64
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  # twikit-dotnet（twikit の C# 移植）。NuGet には無いので、ローカル開発と同じくリポジトリの隣に clone して参照する。
+  TWIKIT_DOTNET_REPO: amanetoki7/twikit-dotnet
+  TWIKIT_DOTNET_REF: main
+  PROJECT: WinUI-3-twikit/frontend/WinUI3Twikit/WinUI3Twikit/WinUI3Twikit.csproj
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: x64
+            rid: win-x64
+    steps:
+      - name: Checkout WinUI-3-twikit
+        uses: actions/checkout@v4
+        with:
+          path: WinUI-3-twikit
+
+      - name: Checkout twikit-dotnet (sibling directory, same layout as local development)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.TWIKIT_DOTNET_REPO }}
+          ref: ${{ env.TWIKIT_DOTNET_REF }}
+          path: twikit-dotnet
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Resolve version from tag
+        id: version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = ""
+          if ("${{ github.ref_type }}" -eq "tag" -and $tag -match '^v?(\d+\.\d+\.\d+)') {
+            $version = $Matches[1]
+          }
+          $label = if ("${{ github.ref_type }}" -eq "tag") { $tag } else { "ci-" + "${{ github.sha }}".Substring(0, 7) }
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "label=$label" >> $env:GITHUB_OUTPUT
+          Write-Host "tag=$tag version=$version label=$label"
+
+      - name: Publish single-file exe
+        shell: pwsh
+        env:
+          TWIKIT_DOTNET_DIR: ${{ github.workspace }}\twikit-dotnet
+        run: |
+          $props = @(
+            "-p:Platform=${{ matrix.platform }}",
+            "-p:PublishSingleFile=true"
+          )
+          if ("${{ steps.version.outputs.version }}" -ne "") {
+            $props += "-p:Version=${{ steps.version.outputs.version }}"
+          }
+          dotnet publish $env:PROJECT -c Release -r ${{ matrix.rid }} --self-contained true -o publish/${{ matrix.rid }} @props
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-ChildItem publish/${{ matrix.rid }}
+
+      - name: Collect release asset
+        id: asset
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem publish/${{ matrix.rid }} -Filter *.exe | Select-Object -First 1
+          if (-not $exe) { throw "No exe found in publish/${{ matrix.rid }}" }
+          $name = "WinUI3Twikit-${{ steps.version.outputs.label }}-${{ matrix.rid }}.exe"
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item $exe.FullName "dist/$name"
+          Get-FileHash "dist/$name" -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $name" } | Out-File "dist/$name.sha256" -Encoding ascii
+          "name=$name" >> $env:GITHUB_OUTPUT
+          Get-ChildItem dist
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinUI3Twikit-${{ matrix.rid }}
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.version.outputs.tag }}
+          files: dist/*
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}

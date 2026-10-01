@@ -1,4 +1,0 @@
-twikit @ git+https://github.com/yukari-557fd8/twikit.git
-fastapi
-uvicorn[standard]
-python-multipart

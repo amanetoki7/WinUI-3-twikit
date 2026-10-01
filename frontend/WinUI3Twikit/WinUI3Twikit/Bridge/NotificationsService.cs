@@ -1,0 +1,380 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.Linq;
+using System.Text.Json.Nodes;
+using System.Threading.Tasks;
+using Twikit;
+using Twikit.Api;
+
+namespace WinUI3Twikit.Bridge
+{
+    /// <summary>
+    /// 通知の取得（旧 <c>get_notifications_twikit.py</c>）。
+    /// X の <c>notifications/all.json</c> の生の JSON を、WinUI 側（<c>NotificationDto</c>）の形に組み替える。
+    /// </summary>
+    internal static class NotificationsService
+    {
+        private static readonly object Gate = new();
+        private static string? _notificationsCursor;      // 次ページ用。refresh で捨てる。
+        private static bool _notificationsExhausted;
+
+        private static readonly Dictionary<string, int> Months = new(StringComparer.Ordinal)
+        {
+            ["Jan"] = 1, ["Feb"] = 2, ["Mar"] = 3, ["Apr"] = 4, ["May"] = 5, ["Jun"] = 6,
+            ["Jul"] = 7, ["Aug"] = 8, ["Sep"] = 9, ["Oct"] = 10, ["Nov"] = 11, ["Dec"] = 12,
+        };
+
+        public static async Task<JsonArray> GetNotificationsAsync(int count, bool refresh)
+        {
+            var results = new JsonArray();
+
+            try
+            {
+                TwikitSession.Login();
+                var client = TwikitSession.Client;
+
+                string? cursor;
+                lock (Gate)
+                {
+                    if (refresh)
+                    {
+                        _notificationsCursor = null;
+                        _notificationsExhausted = false;
+                        cursor = null;
+                        Debug.WriteLine("✅ 通知: 最新から取得");
+                    }
+                    else
+                    {
+                        if (_notificationsExhausted || string.IsNullOrEmpty(_notificationsCursor))
+                        {
+                            Debug.WriteLine("これ以上通知はありません");
+                            return results;
+                        }
+
+                        cursor = _notificationsCursor;
+                        Debug.WriteLine(".cursor で追加取得");
+                    }
+                }
+
+                var parameters = new Dictionary<string, string>
+                {
+                    ["count"] = count.ToString(CultureInfo.InvariantCulture),
+                    ["include_ext_views"] = "true",
+                    ["include_reply_count"] = "1",
+                };
+                if (cursor is not null)
+                {
+                    parameters["cursor"] = cursor;
+                }
+
+                var response = await client.GetAsync(
+                    V11Endpoint.NotificationsAll,
+                    new RequestOptions { Params = parameters, Headers = client.BaseHeaders }).ConfigureAwait(false);
+                var json = response.Object ?? new JsonObject();
+                results = ItemsFromResponse(json);
+
+                var nextCursor = BottomCursor(json);
+                lock (Gate)
+                {
+                    if (nextCursor is not null && nextCursor != cursor)
+                    {
+                        _notificationsCursor = nextCursor;
+                        _notificationsExhausted = false;
+                    }
+                    else
+                    {
+                        _notificationsCursor = null;
+                        _notificationsExhausted = true;
+                    }
+                }
+
+                if (results.Count == 0)
+                {
+                    Debug.WriteLine("通知はありません");
+                    return results;
+                }
+
+                var replyCount = results.Count(item => item?["type"]?.GetValue<string>() == "reply");
+                Debug.WriteLine($"Notifications 取得: {results.Count} 件 (reply {replyCount})");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Notifications取得エラー: {ex.Message}");
+                lock (Gate)
+                {
+                    _notificationsCursor = null;
+                    _notificationsExhausted = false;
+                }
+            }
+
+            return results;
+        }
+
+        internal static string? BottomCursor(JsonObject response)
+        {
+            foreach (var instruction in response.Sub("timeline").ArrOrEmpty("instructions").Objects())
+            {
+                foreach (var entry in instruction.Sub("addEntries").ArrOrEmpty("entries").Objects())
+                {
+                    if (!(entry.Str("entryId") ?? string.Empty).StartsWith("cursor-bottom", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    var content = entry.Sub("content");
+                    var value = content.Sub("operation").Sub("cursor").Str("value") ?? content.Str("value");
+                    if (!string.IsNullOrEmpty(value))
+                    {
+                        return value;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>"Tue Sep 29 03:04:05 +0000 2026" をエポックミリ秒に。ロケールの strptime に依存しない。</summary>
+        private static long TimestampMsFromTwitter(string createdAt)
+        {
+            var parts = (createdAt ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 6 || !Months.TryGetValue(parts[1], out var month))
+            {
+                return 0;
+            }
+
+            try
+            {
+                var day = int.Parse(parts[2], CultureInfo.InvariantCulture);
+                var time = parts[3].Split(':');
+                var hour = int.Parse(time[0], CultureInfo.InvariantCulture);
+                var minute = int.Parse(time[1], CultureInfo.InvariantCulture);
+                var second = int.Parse(time[2], CultureInfo.InvariantCulture);
+                var year = int.Parse(parts[5], CultureInfo.InvariantCulture);
+                var tz = parts[4];
+                var sign = tz.StartsWith('+') ? 1 : -1;
+                var offset = new TimeSpan(
+                    sign * int.Parse(tz.Substring(1, 2), CultureInfo.InvariantCulture),
+                    sign * int.Parse(tz.Substring(3, 2), CultureInfo.InvariantCulture),
+                    0);
+                var dt = new DateTimeOffset(year, month, day, hour, minute, second, offset);
+                return dt.ToUnixTimeMilliseconds();
+            }
+            catch (Exception ex) when (ex is FormatException or ArgumentException or IndexOutOfRangeException or OverflowException)
+            {
+                return 0;
+            }
+        }
+
+        private static string FormatTimestampMs(long timestampMs)
+        {
+            if (timestampMs == 0)
+            {
+                return "不明";
+            }
+
+            return DateTimeOffset.FromUnixTimeMilliseconds(timestampMs)
+                .ToOffset(TweetSerializer.Jst)
+                .ToString("yyyy/MM/dd HH:mm:ss", CultureInfo.InvariantCulture);
+        }
+
+        private static int ViewCount(JsonObject tweet)
+        {
+            foreach (var key in new[] { "ext_views", "views" })
+            {
+                if (tweet.Get(key) is JsonObject views)
+                {
+                    return TweetSerializer.MetricCount(views.Get("count").AsLong());
+                }
+            }
+
+            return 0;
+        }
+
+        private static string TweetText(JsonObject tweet)
+        {
+            if (tweet.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            var note = tweet.Sub("note_tweet").Sub("note_tweet_results").Sub("result").Str("text");
+            return NonEmpty(note) ?? NonEmpty(tweet.Str("full_text")) ?? tweet.Str("text") ?? string.Empty;
+        }
+
+        private static string? NonEmpty(string? value) => string.IsNullOrEmpty(value) ? null : value;
+
+        /// <summary>返信先として別行に出す @ユーザー名を、本文先頭から外す。</summary>
+        private static string StripLeadingReplyMention(string text, string screenName)
+        {
+            var name = (screenName ?? string.Empty).Trim().TrimStart('@');
+            if (string.IsNullOrEmpty(text) || name.Length == 0)
+            {
+                return text;
+            }
+
+            var prefix = "@" + name;
+            if (text.Length < prefix.Length
+                || !string.Equals(text[..prefix.Length], prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return text;
+            }
+
+            var rest = text[prefix.Length..];
+            if (rest.Length > 0 && rest[0] < 128 && (char.IsLetterOrDigit(rest[0]) || rest[0] == '_'))
+            {
+                return text;
+            }
+
+            return rest.TrimStart(' ', '\t', '\r', '\n', '　');
+        }
+
+        private static string ReplyToScreenName(JsonObject tweet, JsonObject users, JsonObject tweets)
+        {
+            var name = (tweet.Str("in_reply_to_screen_name") ?? string.Empty).Trim().TrimStart('@');
+            if (name.Length > 0)
+            {
+                return name;
+            }
+
+            var userId = tweet.Str("in_reply_to_user_id_str") ?? tweet.Str("in_reply_to_user_id") ?? string.Empty;
+            name = (users.Sub(userId).Str("screen_name") ?? string.Empty).Trim().TrimStart('@');
+            if (name.Length > 0)
+            {
+                return name;
+            }
+
+            var parentId = tweet.Str("in_reply_to_status_id_str") ?? tweet.Str("in_reply_to_status_id") ?? string.Empty;
+            var parent = tweets.Sub(parentId);
+            var parentUserId = parent.Str("user_id_str") ?? parent.Str("user_id") ?? string.Empty;
+            return (users.Sub(parentUserId).Str("screen_name") ?? string.Empty).Trim().TrimStart('@');
+        }
+
+        private static bool UserVerified(JsonObject user)
+            => user.Get("verified").IsTruthy()
+               || user.Get("is_blue_verified").IsTruthy()
+               || user.Get("ext_is_blue_verified").IsTruthy();
+
+        private static void AddActor(JsonObject item, JsonObject users, string? userId)
+        {
+            var user = string.IsNullOrEmpty(userId) ? new JsonObject() : users.Sub(userId);
+            if (user.Count == 0)
+            {
+                item["actor_name"] = "Unknown";
+                item["actor_screen_name"] = string.Empty;
+                item["actor_profile_image"] = string.Empty;
+                return;
+            }
+
+            item["actor_name"] = NonEmpty(user.Str("name")) ?? "Unknown";
+            item["actor_screen_name"] = user.Str("screen_name") ?? string.Empty;
+            item["actor_profile_image"] = NonEmpty(user.Str("profile_image_url_https")) ?? user.Str("profile_image_url") ?? string.Empty;
+        }
+
+        internal static JsonArray ItemsFromResponse(JsonObject response)
+        {
+            var globalObjects = response.Sub("globalObjects");
+            var users = globalObjects.Sub("users");
+            var tweets = globalObjects.Sub("tweets");
+            var extracted = new List<(long TimestampMs, JsonObject Item)>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (var kv in globalObjects.Sub("notifications"))
+            {
+                if (kv.Value is not JsonObject notification)
+                {
+                    continue;
+                }
+
+                var actions = notification.Sub("template").Sub("aggregateUserActionsV1");
+                if (actions.Count == 0)
+                {
+                    continue;
+                }
+
+                var notificationId = notification.Str("id") ?? string.Empty;
+                if (notificationId.Length == 0 || !seen.Add(notificationId))
+                {
+                    continue;
+                }
+
+                var fromUsers = actions.ArrOrEmpty("fromUsers");
+                var userId = fromUsers.Count > 0 ? fromUsers[0].Sub("user").Str("id") : null;
+                var targetObjects = actions.ArrOrEmpty("targetObjects");
+                var targetId = targetObjects.Count > 0 ? targetObjects[0].Sub("tweet").Str("id") : null;
+                var target = string.IsNullOrEmpty(targetId) ? new JsonObject() : tweets.Sub(targetId);
+                var timestampMs = notification.Get("timestampMs").AsLong() ?? 0;
+
+                var item = new JsonObject
+                {
+                    ["id"] = notificationId,
+                    ["type"] = "unknown",
+                    ["text"] = TweetSerializer.NormalizeText(notification.Sub("message").Str("text") ?? string.Empty),
+                    ["created_at"] = FormatTimestampMs(timestampMs),
+                    ["target_tweet_text"] = TweetSerializer.NormalizeText(TweetText(target)),
+                };
+                AddActor(item, users, userId);
+                extracted.Add((timestampMs, item));
+            }
+
+            // リプライは notifications 辞書に入らず、timeline の tweet entry として届く。
+            foreach (var instruction in response.Sub("timeline").ArrOrEmpty("instructions").Objects())
+            {
+                foreach (var entry in instruction.Sub("addEntries").ArrOrEmpty("entries").Objects())
+                {
+                    var item = entry.Sub("content").Sub("item");
+                    if (item.Sub("clientEventInfo").Str("element") != "user_replied_to_your_tweet")
+                    {
+                        continue;
+                    }
+
+                    var replyId = item.Sub("content").Sub("tweet").Str("id") ?? string.Empty;
+                    if (replyId.Length == 0 || seen.Contains(replyId))
+                    {
+                        continue;
+                    }
+
+                    var tweet = tweets.Obj(replyId);
+                    if (tweet is null || tweet.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    seen.Add(replyId);
+                    var timestampMs = TimestampMsFromTwitter(tweet.Str("created_at") ?? string.Empty);
+                    var user = users.Sub(tweet.Str("user_id_str") ?? string.Empty);
+                    var replyTo = ReplyToScreenName(tweet, users, tweets);
+
+                    var replyItem = new JsonObject
+                    {
+                        ["id"] = replyId,
+                        ["type"] = "reply",
+                        ["text"] = StripLeadingReplyMention(TweetSerializer.NormalizeText(TweetText(tweet)), replyTo),
+                        ["created_at"] = FormatTimestampMs(timestampMs),
+                        ["target_tweet_text"] = string.Empty,
+                        ["reply_count"] = TweetSerializer.MetricCount(tweet.Get("reply_count").AsLong()),
+                        ["retweet_count"] = TweetSerializer.MetricCount(tweet.Get("retweet_count").AsLong()),
+                        ["favorite_count"] = TweetSerializer.MetricCount(tweet.Get("favorite_count").AsLong()),
+                        ["view_count"] = ViewCount(tweet),
+                        ["is_liked"] = tweet.Get("favorited").IsTruthy(),
+                        ["is_retweeted"] = tweet.Get("retweeted").IsTruthy(),
+                        ["user_protected"] = user.Get("protected").IsTruthy(),
+                        ["user_verified"] = UserVerified(user),
+                        ["reply_to_screen_name"] = replyTo,
+                    };
+                    AddActor(replyItem, users, tweet.Str("user_id_str"));
+                    extracted.Add((timestampMs, replyItem));
+                }
+            }
+
+            var array = new JsonArray();
+            foreach (var (_, item) in extracted.OrderByDescending(e => e.TimestampMs))
+            {
+                array.Add(item);
+            }
+
+            return array;
+        }
+    }
+}
