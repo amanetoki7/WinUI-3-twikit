@@ -1,9 +1,8 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using System.Collections.Generic;
-using System.IO;
-using System.Text.Json;
 using System;
+using System.Threading.Tasks;
+using WinUI3Twikit.Bridge;
 
 namespace WinUI3Twikit
 {
@@ -11,36 +10,8 @@ namespace WinUI3Twikit
     {
         private readonly string jsonPath = ResolveCookiesPath();
 
-        private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
-
-        private static string ResolveCookiesPath()
-        {
-            var configured = Environment.GetEnvironmentVariable("COOKIES_FILE");
-            if (!string.IsNullOrWhiteSpace(configured))
-            {
-                return configured;
-            }
-
-            var root = Environment.GetEnvironmentVariable("WINUI3TWIKIT_ROOT");
-            if (!string.IsNullOrWhiteSpace(root))
-            {
-                return Path.Combine(root, "data", "cookies.json");
-            }
-
-            var directory = new DirectoryInfo(AppContext.BaseDirectory);
-            while (directory != null)
-            {
-                var candidate = Path.Combine(directory.FullName, "data", "cookies.json");
-                if (File.Exists(candidate))
-                {
-                    return candidate;
-                }
-
-                directory = directory.Parent;
-            }
-
-            return Path.Combine(AppContext.BaseDirectory, "data", "cookies.json");
-        }
+        // 保存先はブリッジ（RepositoryPaths）と同じ解決順。単一 exe では exe の隣の data\cookies.json になる。
+        private static string ResolveCookiesPath() => RepositoryPaths.CookiesPath;
 
         public SettingsPage()
         {
@@ -51,38 +22,61 @@ namespace WinUI3Twikit
 
         private void LoadJsonValues()
         {
-            if (!File.Exists(jsonPath))
+            // ファイルが無い・壊れているときは何もしない（例外で落とさない）
+            if (!CookiesFile.TryRead(jsonPath, out var auth, out var ct0))
             {
-                return; // ファイルが無ければ何もしない
+                return;
             }
-
-            var json = File.ReadAllText(jsonPath);
-            var dict = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
-
-            if (dict == null) return;
 
             // TextBox に初期値をセット
-            if (dict.TryGetValue("auth_token", out var auth))
+            TextBoxA.Text = auth;
+            TextBoxB.Text = ct0;
+        }
+
+        private async void OnApplyClick(object sender, RoutedEventArgs e)
+        {
+            try
             {
-                TextBoxA.Text = auth;
+                // フォルダーが無ければ作って保存する（単一 exe の初回は exe の隣に data\ がまだ無い）
+                CookiesFile.Save(jsonPath, TextBoxA.Text, TextBoxB.Text);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Cookie 保存失敗: {ex}");
+                await ShowMessageAsync("保存に失敗しました", $"{ex.Message}\n\n保存先: {jsonPath}");
+                return;
             }
 
-            if (dict.TryGetValue("ct0", out var ct0))
+            // 保存した Cookie でログインし直し、左ペインの状態表示を更新する（「サーバーを再起動」と同じ処理）
+            if (App.MainWindow is MainWindow mainWindow)
             {
-                TextBoxB.Text = ct0;
+                await mainWindow.RestartServerAsync();
             }
         }
 
-        private void OnApplyClick(object sender, RoutedEventArgs e)
+        private async Task ShowMessageAsync(string title, string message)
         {
-            // 保存処理（前回のコードと同じ）
-            var dict = new Dictionary<string, string>
+            if (XamlRoot is null)
             {
-                ["auth_token"] = TextBoxA.Text,
-                ["ct0"] = TextBoxB.Text
+                return;
+            }
+
+            var dialog = new ContentDialog
+            {
+                Title = title,
+                Content = message,
+                CloseButtonText = "閉じる",
+                XamlRoot = XamlRoot,
             };
 
-            File.WriteAllText(jsonPath, JsonSerializer.Serialize(dict, JsonOptions));
+            try
+            {
+                await dialog.ShowAsync();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"ダイアログ表示失敗: {ex.Message}");
+            }
         }
 
         private async void OnRestartServerClick(object sender, RoutedEventArgs e)

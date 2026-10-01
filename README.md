@@ -204,6 +204,20 @@ dotnet build frontend\WinUI3Twikit\WinUI3Twikit\WinUI3Twikit.csproj -c Debug -p:
 
 ビルド後、Visual Studio から実行するか、生成された `WinUI 3  Twitter.exe` を起動します。
 
+### 方法 C: 単一 exe（リリース版）
+
+[Releases](https://github.com/amanetoki7/WinUI-3-twikit/releases) の `WinUI3Twikit-<タグ>-win-x64.exe` は .NET ランタイムと Windows App SDK を同梱した自己完結型の単一ファイルです。インストール不要で、exe を置いたフォルダーの `data\cookies.json`（または環境変数 `COOKIES_FILE`）を読みます。初回起動時に `%TEMP%\.net\` へ展開されるため、起動に少し時間がかかります。
+
+初回は **設定** 画面で `auth_token` と `ct0` を入力して **適用** を押してください。exe の隣に `data\cookies.json` が作られ、そのままログインし直して左ペインの表示が `Twikit: Ready ✅ (@ユーザー名)` に変わります。
+
+同じものをローカルで作るには:
+
+```powershell
+dotnet publish frontend\WinUI3Twikit\WinUI3Twikit\WinUI3Twikit.csproj -c Release -r win-x64 -p:Platform=x64 -p:PublishSingleFile=true -o publish\win-x64
+```
+
+単一 exe 用の設定（`WindowsPackageType=None`、`WindowsAppSDKSelfContained` など）は `WinUI3Twikit.csproj` に `PublishSingleFile=true` のときだけ有効になる形で入っています。
+
 ### 起動時の挙動
 
 - アプリ起動時に `data/cookies.json` を読み込み、X にログインできるか確認します
@@ -221,6 +235,20 @@ dotnet build frontend\WinUI3Twikit\WinUI3Twikit\WinUI3Twikit.csproj -c Debug -p:
 | `Twikit: 接続失敗 ❌` | ネットワーク、または X 側の制限 | 接続を確認して「サーバーを再起動」。Cloudflare 等に拒否される場合は時間を置く |
 | タイムラインが空 / エラー | トークンの期限切れ | ブラウザから cookie を再取得し、設定画面で更新する |
 | 検索結果が常に空 | X がそのアカウントに検索結果を返していない（新規・制限中のアカウントなど） | 別のアカウントで確認する（ブリッジ側の問題ではありません） |
+
+## リリース（GitHub Actions）
+
+[.github/workflows/release.yml](.github/workflows/release.yml) は `v*` 形式のタグを push すると起動し、`windows-latest` 上で twikit-dotnet（`amanetoki7/twikit-dotnet` の `main`）を隣に checkout して単一 exe を publish し、GitHub Release を作成して `WinUI3Twikit-<タグ>-win-x64.exe` と SHA-256 を添付します。リリースノートはコミット履歴から自動生成されます。
+
+```powershell
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+- タグが `v1.2.3` 形式のとき、exe のバージョン情報（`-p:Version`）にも反映されます
+- `v1.2.3-beta.1` のようにハイフンを含むタグはプレリリースになります
+- Actions タブから手動実行（workflow_dispatch）した場合は Release を作らず、Artifacts に exe を置きます
+- twikit-dotnet の参照先を変えるには、ワークフロー先頭の `TWIKIT_DOTNET_REPO` / `TWIKIT_DOTNET_REF` を編集します
 
 ## セキュリティ
 

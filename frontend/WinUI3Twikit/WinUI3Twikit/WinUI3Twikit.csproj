@@ -55,6 +55,21 @@
         <ProjectReference Include="$(TwikitDotnetDir)src\Twikit\Twikit.csproj" />
     </ItemGroup>
 
+    <!--
+      単一 exe の publish 用（GitHub Actions の release ワークフローと同じ）:
+        dotnet publish WinUI3Twikit.csproj -c Release -r win-x64 -p:Platform=x64 -p:PublishSingleFile=true
+      Windows App SDK の SingleFile.targets が要求する設定。通常のビルドや MSIX パッケージには影響しない。
+    -->
+    <PropertyGroup Condition="'$(PublishSingleFile)' == 'true'">
+        <WindowsPackageType>None</WindowsPackageType>
+        <EnableMsixTooling>true</EnableMsixTooling>
+        <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+        <SelfContained>true</SelfContained>
+        <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+        <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+        <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    </PropertyGroup>
+
     <PropertyGroup Label="Globals">
       <WebView2DispatchAdapterNamespace>WinUI 3  Twitter</WebView2DispatchAdapterNamespace>
     </PropertyGroup>
