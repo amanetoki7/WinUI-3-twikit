@@ -44,7 +44,7 @@
                     <FontIcon Glyph="&#xE72E;"
                               FontSize="12"
                               VerticalAlignment="Center"
-                              Foreground="White"
+                              Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                               Visibility="{x:Bind IsUserProtected, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"/>
                 </StackPanel>
                 <TextBlock Text="{x:Bind UserScreenName, Mode=OneWay}"

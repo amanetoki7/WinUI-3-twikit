@@ -80,7 +80,7 @@
             <ListView.ItemTemplate>
                 <DataTemplate x:DataType="local:ListItemViewModel">
                     <Border Margin="0,6" Padding="16" CornerRadius="12"
-                            Background="#1F1F1F" BorderBrush="#2A2A2A" BorderThickness="1">
+                            Background="{ThemeResource TweetCardBackgroundBrush}" BorderBrush="{ThemeResource TweetCardBorderBrush}" BorderThickness="1">
                         <StackPanel Spacing="6">
                             <TextBlock Text="{x:Bind Name}"
                                        Style="{StaticResource BodyStrongTextBlockStyle}"
