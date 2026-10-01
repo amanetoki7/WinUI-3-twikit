@@ -38,20 +38,12 @@ namespace WinUI3Twikit
             // Presenter を取得（標準の OverlappedPresenter）
             OverlappedPresenter? presenter = appWindow.Presenter as OverlappedPresenter;
 
-            // #202020 を Color に変換
-            var dark202020 = Color.FromArgb(255, 32, 32, 32); // #202020
-
-            // タイトルバー背景
-            appWindow.TitleBar.BackgroundColor = dark202020;
-            appWindow.TitleBar.InactiveBackgroundColor = dark202020;
-
-            // ボタン背景
-            appWindow.TitleBar.ButtonBackgroundColor = dark202020;
-            appWindow.TitleBar.ButtonInactiveBackgroundColor = dark202020;
-
-            // ボタン前景（アイコン）
-            appWindow.TitleBar.ButtonForegroundColor = Colors.White;
-            appWindow.TitleBar.ButtonInactiveForegroundColor = Colors.Gray;
+            // タイトルバーの色はテーマに合わせる（ライト/ダーク切り替え時にも追従する）
+            ApplyTitleBarTheme(appWindow);
+            if (Content is FrameworkElement root)
+            {
+                root.ActualThemeChanged += (_, _) => ApplyTitleBarTheme(appWindow);
+            }
 
             // 必要なら最大化/最小化ボタンの制御
             if (presenter is not null)
@@ -60,6 +52,32 @@ namespace WinUI3Twikit
                 presenter.IsMinimizable = true;
             }
         }
+
+        private void ApplyTitleBarTheme(AppWindow appWindow)
+        {
+            bool isLight = (Content as FrameworkElement)?.ActualTheme == ElementTheme.Light;
+
+            // ダークは従来どおり #202020、ライトは Mica のライト基調に近い #F3F3F3
+            var background = isLight
+                ? Color.FromArgb(255, 243, 243, 243)
+                : Color.FromArgb(255, 32, 32, 32);
+            var buttonForeground = isLight ? Colors.Black : Colors.White;
+
+            var titleBar = appWindow.TitleBar;
+
+            // タイトルバー背景
+            titleBar.BackgroundColor = background;
+            titleBar.InactiveBackgroundColor = background;
+
+            // ボタン背景
+            titleBar.ButtonBackgroundColor = background;
+            titleBar.ButtonInactiveBackgroundColor = background;
+
+            // ボタン前景（アイコン）
+            titleBar.ButtonForegroundColor = buttonForeground;
+            titleBar.ButtonInactiveForegroundColor = Colors.Gray;
+        }
+
         public void SetWindowTitle(string pageName)
         {
             string appName = "WinUI 3 Twitter";  // ← アプリ名をここで統一管理
