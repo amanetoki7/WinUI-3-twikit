@@ -1,7 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media;
 using System.Linq;
 
 namespace WinUI3Twikit.Controls
@@ -32,11 +31,6 @@ namespace WinUI3Twikit.Controls
             set => SetValue(TweetProperty, value);
         }
 
-        private static readonly SolidColorBrush DefaultBorderBrush = new(Windows.UI.Color.FromArgb(255, 42, 42, 42));
-        private static readonly SolidColorBrush HoverBorderBrush = new(Windows.UI.Color.FromArgb(255, 58, 58, 58));
-        private static readonly SolidColorBrush DefaultBackgroundBrush = new(Windows.UI.Color.FromArgb(255, 26, 26, 26));
-        private static readonly SolidColorBrush HoverBackgroundBrush = new(Windows.UI.Color.FromArgb(255, 37, 37, 37));
-
         public QuotedTweetCard()
         {
             InitializeComponent();
@@ -50,14 +44,13 @@ namespace WinUI3Twikit.Controls
                 return;
             }
 
-            QuoteBorder.Background = HoverBackgroundBrush;
-            QuoteBorder.BorderBrush = HoverBorderBrush;
+            // ホバー色は XAML の VisualState (ThemeResource) で切り替える
+            VisualStateManager.GoToState(this, "PointerOver", true);
         }
 
         private void QuoteBorder_PointerExited(object sender, PointerRoutedEventArgs e)
         {
-            QuoteBorder.Background = DefaultBackgroundBrush;
-            QuoteBorder.BorderBrush = DefaultBorderBrush;
+            VisualStateManager.GoToState(this, "Normal", true);
         }
 
         private void QuoteBorder_Tapped(object sender, TappedRoutedEventArgs e)

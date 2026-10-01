@@ -18,15 +18,27 @@
     </UserControl.Resources>
 
     <Border x:Name="QuoteBorder"
-            BorderBrush="#2A2A2A"
+            BorderBrush="{ThemeResource QuotedTweetCardBorderBrush}"
             BorderThickness="1"
             CornerRadius="12"
             Padding="12"
-            Background="#1A1A1A"
+            Background="{ThemeResource QuotedTweetCardBackgroundBrush}"
             IsHitTestVisible="{x:Bind Tweet.QuotedTweet.IsUnavailable, Mode=OneWay, Converter={StaticResource InverseBoolConverter}}"
             PointerEntered="QuoteBorder_PointerEntered"
             PointerExited="QuoteBorder_PointerExited"
             Tapped="QuoteBorder_Tapped">
+        <!-- ホバー色。テーマごとの値は App.xaml の ThemeDictionaries を参照 -->
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="PointerStates">
+                <VisualState x:Name="Normal"/>
+                <VisualState x:Name="PointerOver">
+                    <VisualState.Setters>
+                        <Setter Target="QuoteBorder.Background" Value="{ThemeResource QuotedTweetCardHoverBackgroundBrush}"/>
+                        <Setter Target="QuoteBorder.BorderBrush" Value="{ThemeResource QuotedTweetCardHoverBorderBrush}"/>
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
         <StackPanel Spacing="12">
             <controls:TweetUserRow
                 Visibility="{x:Bind Tweet.QuotedTweet.IsUnavailable, Mode=OneWay, Converter={StaticResource InverseBoolToVisibilityConverter}}"
@@ -54,7 +66,7 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="local:MediaItem">
-                        <Border CornerRadius="8" Background="#1A1A1A" Margin="0,4" MaxWidth="320">
+                        <Border CornerRadius="8" Background="{ThemeResource TweetMediaBackgroundBrush}" Margin="0,4" MaxWidth="320">
                             <Grid>
                                 <Image Source="{x:Bind ThumbnailImage, Mode=OneTime}"
                                        Tag="{x:Bind Url, Mode=OneTime}"
