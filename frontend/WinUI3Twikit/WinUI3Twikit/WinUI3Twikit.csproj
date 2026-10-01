@@ -41,6 +41,20 @@
         <PackageReference Include="CommunityToolkit.WinUI.Notifications" Version="7.1.2" />
     </ItemGroup>
 
+    <!--
+      twikit-dotnet（twikit の C# 移植。Python バックエンドの代わりに Bridge/ から直接呼び出す）。
+      既定ではこのリポジトリの隣（..\twikit-dotnet）に clone されている前提。
+      別の場所にある場合は環境変数 TWIKIT_DOTNET_DIR か MSBuild プロパティ TwikitDotnetDir で指定する。
+    -->
+    <PropertyGroup>
+        <TwikitDotnetDir Condition="'$(TwikitDotnetDir)' == '' and '$(TWIKIT_DOTNET_DIR)' != ''">$([MSBuild]::EnsureTrailingSlash('$(TWIKIT_DOTNET_DIR)'))</TwikitDotnetDir>
+        <TwikitDotnetDir Condition="'$(TwikitDotnetDir)' == ''">$(MSBuildThisFileDirectory)..\..\..\..\twikit-dotnet\</TwikitDotnetDir>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="$(TwikitDotnetDir)src\Twikit\Twikit.csproj" />
+    </ItemGroup>
+
     <PropertyGroup Label="Globals">
       <WebView2DispatchAdapterNamespace>WinUI 3  Twitter</WebView2DispatchAdapterNamespace>
     </PropertyGroup>
