@@ -25,6 +25,15 @@ namespace WinUI3Twikit
         public App()
         {
             InitializeComponent();
+
+            // UI イベントハンドラー内で起きた例外でプロセスごと落ちないようにする（ログに残して継続）。
+            UnhandledException += OnUnhandledException;
+        }
+
+        private static void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
+        {
+            System.Diagnostics.Debug.WriteLine($"Unhandled exception: {e.Exception}");
+            e.Handled = true;
         }
 
         protected override void OnLaunched(LaunchActivatedEventArgs args)

@@ -12,4 +12,10 @@
     <Platform Solution="*|x64" Project="x64" />
     <Platform Solution="*|x86" Project="x86" />
   </Project>
+  <!-- twikit-dotnet: このリポジトリの隣に clone したものを参照する（WinUI3Twikit.csproj の TwikitDotnetDir と同じ場所） -->
+  <Project Path="../../../twikit-dotnet/src/Twikit/Twikit.csproj">
+    <Platform Solution="*|ARM64" Project="AnyCPU" />
+    <Platform Solution="*|x64" Project="AnyCPU" />
+    <Platform Solution="*|x86" Project="AnyCPU" />
+  </Project>
 </Solution>
