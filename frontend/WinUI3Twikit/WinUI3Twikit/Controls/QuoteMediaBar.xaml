@@ -29,7 +29,7 @@
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <Grid Width="88" Height="88">
-                            <Border CornerRadius="8" Background="#1E1E1E" BorderBrush="#555" BorderThickness="1">
+                            <Border CornerRadius="8" Background="{ThemeResource TweetMediaPreviewBackgroundBrush}" BorderBrush="{ThemeResource TweetMediaPreviewBorderBrush}" BorderThickness="1">
                                 <Image Source="{Binding Preview}" Stretch="UniformToFill"/>
                             </Border>
                             <Button Content="✕"

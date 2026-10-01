@@ -39,7 +39,7 @@
                        FontSize="20"
                        VerticalAlignment="Center"
                        Margin="8,0,12,0"
-                       Foreground="White"/>
+                       Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
 
             <TextBlock x:Name="SelectedMediaCount"
                        Grid.Column="3"
@@ -74,7 +74,7 @@
                     <DataTemplate>
                         <StackPanel Width="140" Margin="4">
                             <Grid Height="140">
-                                <Border CornerRadius="8" Background="#1E1E1E" BorderBrush="#555" BorderThickness="2">
+                                <Border CornerRadius="8" Background="{ThemeResource TweetMediaPreviewBackgroundBrush}" BorderBrush="{ThemeResource TweetMediaPreviewBorderBrush}" BorderThickness="2">
                                     <Image Source="{Binding Preview}" Stretch="UniformToFill"/>
                                 </Border>
                                 <Button Content="✕"
