@@ -462,7 +462,7 @@ namespace WinUI3Twikit
                     CloseButtonText = "閉じる",
                     DefaultButton = ContentDialogButton.None,
                     XamlRoot = root.XamlRoot,
-                    RequestedTheme = ElementTheme.Dark,
+                    RequestedTheme = root.ActualTheme,
                 };
                 var dialogWidth = Math.Min(680d * 1.5, Math.Max(320d, root.XamlRoot.Size.Width - 48));
                 dialog.Resources["ContentDialogMinWidth"] = dialogWidth;

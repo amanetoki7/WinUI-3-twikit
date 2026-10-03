@@ -45,14 +45,14 @@
                        Grid.Column="3"
                        VerticalAlignment="Center"
                        FontSize="14"
-                       Foreground="Gray"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                        Margin="4,0,12,0"/>
 
             <TextBlock x:Name="CountText"
                        Grid.Column="4"
                        VerticalAlignment="Center"
                        HorizontalAlignment="Right"
-                       Foreground="Gray"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                        Text="0 文字"/>
 
             <ProgressRing x:Name="PostingProgressRing"
@@ -92,7 +92,7 @@
                             <TextBlock Text="{Binding ProgressText}"
                                        FontSize="11"
                                        TextWrapping="WrapWholeWords"
-                                       Foreground="Gray"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                        Margin="0,6,0,0"
                                        MaxHeight="48"/>
                         </StackPanel>

@@ -16,7 +16,7 @@
             <TextBlock Text="{Binding QuoteMediaSummary}"
                        VerticalAlignment="Center"
                        FontSize="12"
-                       Foreground="Gray"/>
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
         </StackPanel>
         <ScrollViewer HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Disabled">

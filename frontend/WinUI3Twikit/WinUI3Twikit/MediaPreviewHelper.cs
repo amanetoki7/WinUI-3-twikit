@@ -1,4 +1,3 @@
-using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
@@ -67,13 +66,11 @@ namespace WinUI3Twikit
                 Title = null,
                 Content = content,
                 CloseButtonText = "閉じる",
-                Background = new SolidColorBrush(Colors.Black),
-                RequestedTheme = ElementTheme.Dark,
+                RequestedTheme = host.ActualTheme,
                 FullSizeDesired = true,
                 XamlRoot = host.XamlRoot
             };
 
-            dialog.Resources["ContentDialogBackground"] = new SolidColorBrush(Colors.Black);
             dialog.Resources["ContentDialogMinWidth"] = hostSize.Width - 40;
             dialog.Resources["ContentDialogMinHeight"] = hostSize.Height - 40;
             return dialog;
