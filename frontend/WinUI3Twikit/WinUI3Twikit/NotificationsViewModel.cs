@@ -14,18 +14,55 @@ namespace WinUI3Twikit
 {
     public partial class NotificationsViewModel : INotifyPropertyChanged, ITweetListActions
     {
-        public ObservableCollection<NotificationViewModel> Notifications { get; } = [];
+        private readonly Dictionary<string, ObservableCollection<NotificationViewModel>> _notificationsByType = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, bool> _hasMoreByType = new(StringComparer.Ordinal)
+        {
+            ["all"] = true,
+            ["mentions"] = true,
+        };
+        private readonly Dictionary<string, double> _scrollByType = new(StringComparer.Ordinal);
+
+        public ObservableCollection<NotificationViewModel> Notifications => ListFor(CurrentNotificationType);
+
+        private string _currentNotificationType = "all";
+        public string CurrentNotificationType => _currentNotificationType;
 
         private readonly HttpClient _httpClient = new();
         private bool _isLoading = false;
         private bool _isLoadingMore = false;
-        private bool _hasMore = true;
-        private double _scrollVerticalOffset;
+        private bool _drainingQueue;
+        private string? _inflightType;
+        private string? _queuedType;
 
         public double ScrollVerticalOffset
         {
-            get => _scrollVerticalOffset;
-            set => _scrollVerticalOffset = value;
+            get => _scrollByType.GetValueOrDefault(_currentNotificationType);
+            set => _scrollByType[_currentNotificationType] = value;
+        }
+
+        private static string NormalizeNotificationType(string? type)
+            => string.Equals(type, "mentions", StringComparison.OrdinalIgnoreCase) ? "mentions" : "all";
+
+        private ObservableCollection<NotificationViewModel> ListFor(string type)
+        {
+            if (!_notificationsByType.TryGetValue(type, out var list))
+            {
+                list = [];
+                _notificationsByType[type] = list;
+            }
+
+            return list;
+        }
+
+        private bool HasMoreFor(string type) => _hasMoreByType.GetValueOrDefault(type, true);
+
+        private void SetHasMore(string type, bool value)
+        {
+            _hasMoreByType[type] = value;
+            if (string.Equals(type, _currentNotificationType, StringComparison.Ordinal))
+            {
+                OnPropertyChanged(nameof(HasMore));
+            }
         }
 
         public bool IsLoading
@@ -40,11 +77,7 @@ namespace WinUI3Twikit
             set { _isLoadingMore = value; OnPropertyChanged(nameof(IsLoadingMore)); }
         }
 
-        public bool HasMore
-        {
-            get => _hasMore;
-            private set { _hasMore = value; OnPropertyChanged(nameof(HasMore)); }
-        }
+        public bool HasMore => HasMoreFor(_currentNotificationType);
 
         public event PropertyChangedEventHandler? PropertyChanged;
         private void OnPropertyChanged(string propertyName) =>
@@ -52,108 +85,167 @@ namespace WinUI3Twikit
 
         public async Task LoadNotificationsAsync()
         {
+            var type = _currentNotificationType;
             IsLoading = true;
-            Notifications.Clear();
-            HasMore = true;
-            await LoadMoreNotificationsAsync(refresh: true);
-            IsLoading = false;
+            try
+            {
+                ListFor(type).Clear();
+                SetHasMore(type, true);
+                await LoadMoreNotificationsAsync(refresh: true, notificationType: type);
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+
+            await DrainQueuedTabAsync();
+        }
+
+        /// <summary>
+        /// 表示中のタブを切り替える。空でも取得済みでも最新から取り直す。カーソルは送らない。
+        /// 読み込み中なら、終わってから切り替え先だけ取得する。
+        /// </summary>
+        public async Task SwitchNotificationTypeAsync(string newType)
+        {
+            var type = NormalizeNotificationType(newType);
+            if (string.Equals(type, _currentNotificationType, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _currentNotificationType = type;
+            OnPropertyChanged(nameof(Notifications));
+            OnPropertyChanged(nameof(HasMore));
+
+            if (IsLoading || IsLoadingMore)
+            {
+                _queuedType = string.Equals(type, _inflightType, StringComparison.Ordinal) ? null : type;
+                return;
+            }
+
+            await LoadTabFromLatestAsync(type);
+        }
+
+        private async Task LoadTabFromLatestAsync(string type)
+        {
+            if (ListFor(type).Count == 0)
+            {
+                await LoadNotificationsAsync();
+                return;
+            }
+
+            await LoadMoreNotificationsAsync(refresh: true, notificationType: type);
         }
 
         /// <summary>
         /// 通知を取得
         /// </summary>
         /// <param name="refresh">true: 最新から取得 / false: 続きを取得</param>
-        public async Task LoadMoreNotificationsAsync(bool refresh = false)
+        /// <param name="notificationType">取得先。省略時は呼び出した時点の表示タブ。</param>
+        public async Task LoadMoreNotificationsAsync(bool refresh = false, string? notificationType = null)
         {
-            if (IsLoadingMore || (!refresh && !HasMore)) return;
+            var type = NormalizeNotificationType(notificationType ?? _currentNotificationType);
+            if (IsLoadingMore || (!refresh && !HasMoreFor(type))) return;
+
+            // 既に件数が残っているタブの最新取得は、下端の続きカーソルを捨てない。
+            var keepCursor = refresh && ListFor(type).Count > 0;
+            if (refresh && !keepCursor)
+            {
+                SetHasMore(type, true);
+            }
 
             IsLoadingMore = true;
+            _inflightType = type;
 
             try
             {
-                var url = $"http://localhost:8000/notifications?count=20&refresh={refresh.ToString().ToLower()}";
+                var refreshText = refresh ? "true" : "false";
+                var keepCursorText = keepCursor ? "true" : "false";
+                var url = $"http://localhost:8000/notifications?count=20&refresh={refreshText}&type={type}&keepCursor={keepCursorText}";
                 var response = await _httpClient.GetAsync(url);
                 response.EnsureSuccessStatusCode();
 
                 var json = await response.Content.ReadAsStringAsync();
                 var newNotifs = JsonSerializer.Deserialize<List<NotificationDto>>(json);
+                var list = ListFor(type);
 
                 if (newNotifs == null || newNotifs.Count == 0)
                 {
                     if (!refresh)
                     {
-                        HasMore = false;
+                        SetHasMore(type, false);
                     }
-                    return;
                 }
-
-                int added = 0;
-                foreach (var dto in newNotifs)
+                else
                 {
-                    if (Notifications.Any(n => n.Id == dto.id)) continue;
-
-                    var vm = new NotificationViewModel
+                    int added = 0;
+                    foreach (var dto in newNotifs)
                     {
-                        Id = dto.id ?? "",
-                        Type = dto.type ?? "",
-                        Text = dto.text ?? "",
-                        ActorName = dto.actor_name ?? "",
-                        ActorScreenName = dto.actor_screen_name ?? "",
-                        CreatedAt = dto.created_at ?? "",
-                        TargetTweetText = dto.target_tweet_text ?? "",
-                        IsActorProtected = dto.user_protected,
-                        IsActorVerified = dto.user_verified,
-                        ReplyToScreenName = dto.reply_to_screen_name ?? ""
-                    };
+                        if (list.Any(n => n.Id == dto.id)) continue;
 
-                    if (vm.IsReply)
-                    {
-                        vm.ActionTweet = new TweetViewModel
+                        var vm = new NotificationViewModel
                         {
-                            Id = vm.Id,
-                            Text = vm.Text,
-                            UserName = vm.ActorName,
-                            UserScreenName = string.IsNullOrEmpty(vm.ActorScreenName)
-                                ? string.Empty
-                                : "@" + vm.ActorScreenName,
-                            CreatedAt = vm.CreatedAt,
-                            ReplyCount = dto.reply_count,
-                            RetweetCount = dto.retweet_count,
-                            FavoriteCount = dto.favorite_count,
-                            ViewCount = dto.view_count,
-                            IsLiked = dto.is_liked,
-                            IsRetweeted = dto.is_retweeted,
-                            IsUserProtected = dto.user_protected,
-                            IsUserVerified = dto.user_verified,
+                            Id = dto.id ?? "",
+                            Type = dto.type ?? "",
+                            Text = dto.text ?? "",
+                            ActorName = dto.actor_name ?? "",
+                            ActorScreenName = dto.actor_screen_name ?? "",
+                            CreatedAt = dto.created_at ?? "",
+                            TargetTweetText = dto.target_tweet_text ?? "",
+                            IsActorProtected = dto.user_protected,
+                            IsActorVerified = dto.user_verified,
+                            ReplyToScreenName = dto.reply_to_screen_name ?? ""
                         };
-                    }
 
-                    if (!string.IsNullOrEmpty(dto.actor_profile_image))
-                    {
-                        try
+                        if (vm.IsTweetCard)
                         {
-                            vm.ActorProfileImage = new BitmapImage(new Uri(dto.actor_profile_image));
-                            if (vm.ActionTweet != null)
+                            vm.ActionTweet = new TweetViewModel
                             {
-                                vm.ActionTweet.UserProfileImage = vm.ActorProfileImage;
-                            }
+                                Id = vm.Id,
+                                Text = vm.Text,
+                                UserName = vm.ActorName,
+                                UserScreenName = string.IsNullOrEmpty(vm.ActorScreenName)
+                                    ? string.Empty
+                                    : "@" + vm.ActorScreenName,
+                                CreatedAt = vm.CreatedAt,
+                                ReplyCount = dto.reply_count,
+                                RetweetCount = dto.retweet_count,
+                                FavoriteCount = dto.favorite_count,
+                                ViewCount = dto.view_count,
+                                IsLiked = dto.is_liked,
+                                IsRetweeted = dto.is_retweeted,
+                                IsUserProtected = dto.user_protected,
+                                IsUserVerified = dto.user_verified,
+                            };
                         }
-                        catch { }
+
+                        if (!string.IsNullOrEmpty(dto.actor_profile_image))
+                        {
+                            try
+                            {
+                                vm.ActorProfileImage = new BitmapImage(new Uri(dto.actor_profile_image));
+                                if (vm.ActionTweet != null)
+                                {
+                                    vm.ActionTweet.UserProfileImage = vm.ActorProfileImage;
+                                }
+                            }
+                            catch { }
+                        }
+
+                        list.Add(vm);
+                        added++;
                     }
+                    System.Diagnostics.Debug.WriteLine($"追加通知: {added}件 (refresh={refresh}, type={type})");
 
-                    Notifications.Add(vm);
-                    added++;
-                }
-                System.Diagnostics.Debug.WriteLine($"追加通知: {added}件 (refresh={refresh})");
-
-                if (!refresh && added == 0)
-                {
-                    HasMore = false;
-                }
-                else if (refresh && added > 0)
-                {
-                    // 新着があった場合のみ時系列で Move して並び替え
-                    SortNotificationsByTime();
+                    if (!refresh && added == 0)
+                    {
+                        SetHasMore(type, false);
+                    }
+                    else if (refresh && added > 0)
+                    {
+                        // 新着があった場合のみ時系列で Move して並び替え
+                        SortNotificationsByTime(list);
+                    }
                 }
             }
             catch (Exception ex)
@@ -163,12 +255,42 @@ namespace WinUI3Twikit
             finally
             {
                 IsLoadingMore = false;
+                _inflightType = null;
+            }
+
+            await DrainQueuedTabAsync();
+        }
+
+        private async Task DrainQueuedTabAsync()
+        {
+            if (_drainingQueue || IsLoading || IsLoadingMore || _queuedType is null)
+            {
+                return;
+            }
+
+            _drainingQueue = true;
+            try
+            {
+                while (_queuedType is string queued && !IsLoading && !IsLoadingMore)
+                {
+                    _queuedType = null;
+                    if (!string.Equals(queued, _currentNotificationType, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    await LoadTabFromLatestAsync(queued);
+                }
+            }
+            finally
+            {
+                _drainingQueue = false;
             }
         }
 
-        private void SortNotificationsByTime()
+        private static void SortNotificationsByTime(ObservableCollection<NotificationViewModel> notifications)
         {
-            var sorted = Notifications
+            var sorted = notifications
                 .OrderByDescending(vm => TimeDisplayHelper.TryParse(vm.CreatedAt) ?? DateTime.MinValue)
                 .ThenByDescending(vm => vm.Id, StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -181,10 +303,10 @@ namespace WinUI3Twikit
             for (int targetIndex = 0; targetIndex < sorted.Count; targetIndex++)
             {
                 var item = sorted[targetIndex];
-                int currentIndex = Notifications.IndexOf(item);
+                int currentIndex = notifications.IndexOf(item);
                 if (currentIndex != targetIndex)
                 {
-                    Notifications.Move(currentIndex, targetIndex);
+                    notifications.Move(currentIndex, targetIndex);
                 }
             }
         }
@@ -290,7 +412,9 @@ namespace WinUI3Twikit
         public ImageSource? ActorProfileImage { get; set; }
         public TweetViewModel? ActionTweet { get; set; }
         public bool IsReply => string.Equals(Type, "reply", StringComparison.OrdinalIgnoreCase);
-        public bool ShowAggregateHeader => !IsReply;
+        public bool IsMention => string.Equals(Type, "mention", StringComparison.OrdinalIgnoreCase);
+        public bool IsTweetCard => IsReply || IsMention;
+        public bool ShowAggregateHeader => !IsTweetCard;
 
         public string TypeText => Type?.ToLower() switch
         {

@@ -12,13 +12,20 @@ namespace WinUI3Twikit.Bridge
 {
     /// <summary>
     /// 通知の取得（旧 <c>get_notifications_twikit.py</c>）。
-    /// X の <c>notifications/all.json</c> の生の JSON を、WinUI 側（<c>NotificationDto</c>）の形に組み替える。
+    /// X の <c>notifications/all.json</c> と <c>notifications/mentions.json</c> の生の JSON を、WinUI 側（<c>NotificationDto</c>）の形に組み替える。
     /// </summary>
     internal static class NotificationsService
     {
         private static readonly object Gate = new();
-        private static string? _notificationsCursor;      // 次ページ用。refresh で捨てる。
-        private static bool _notificationsExhausted;
+
+        /// <summary>次ページ用。種別ごと。<c>refresh</c> はその種別だけ捨てる。</summary>
+        private sealed class CursorState
+        {
+            public string? Cursor;
+            public bool Exhausted;
+        }
+
+        private static readonly Dictionary<string, CursorState> Cursors = new(StringComparer.Ordinal);
 
         private static readonly Dictionary<string, int> Months = new(StringComparer.Ordinal)
         {
@@ -26,9 +33,26 @@ namespace WinUI3Twikit.Bridge
             ["Jul"] = 7, ["Aug"] = 8, ["Sep"] = 9, ["Oct"] = 10, ["Nov"] = 11, ["Dec"] = 12,
         };
 
-        public static async Task<JsonArray> GetNotificationsAsync(int count, bool refresh)
+        public static string NormalizeType(string? type)
+            => string.Equals(type, "mentions", StringComparison.OrdinalIgnoreCase) ? "mentions" : "all";
+
+        private static CursorState StateFor(string type)
+        {
+            if (!Cursors.TryGetValue(type, out var state))
+            {
+                state = new CursorState();
+                Cursors[type] = state;
+            }
+
+            return state;
+        }
+
+        public static async Task<JsonArray> GetNotificationsAsync(int count, bool refresh, string? type = null, bool keepCursor = false)
         {
             var results = new JsonArray();
+            var notificationType = NormalizeType(type);
+            // 一覧を残したままの最新取得は、続き用カーソルを先頭ページのもので上書きしない。
+            var preserveCursor = refresh && keepCursor;
 
             try
             {
@@ -38,23 +62,27 @@ namespace WinUI3Twikit.Bridge
                 string? cursor;
                 lock (Gate)
                 {
+                    var state = StateFor(notificationType);
                     if (refresh)
                     {
-                        _notificationsCursor = null;
-                        _notificationsExhausted = false;
+                        if (!preserveCursor)
+                        {
+                            state.Cursor = null;
+                            state.Exhausted = false;
+                        }
                         cursor = null;
-                        Debug.WriteLine("✅ 通知: 最新から取得");
+                        Debug.WriteLine($"✅ 通知({notificationType}): 最新から取得");
                     }
                     else
                     {
-                        if (_notificationsExhausted || string.IsNullOrEmpty(_notificationsCursor))
+                        if (state.Exhausted || string.IsNullOrEmpty(state.Cursor))
                         {
-                            Debug.WriteLine("これ以上通知はありません");
+                            Debug.WriteLine($"これ以上通知はありません ({notificationType})");
                             return results;
                         }
 
-                        cursor = _notificationsCursor;
-                        Debug.WriteLine(".cursor で追加取得");
+                        cursor = state.Cursor;
+                        Debug.WriteLine($".cursor で追加取得 ({notificationType})");
                     }
                 }
 
@@ -69,24 +97,31 @@ namespace WinUI3Twikit.Bridge
                     parameters["cursor"] = cursor;
                 }
 
+                var endpoint = notificationType == "mentions"
+                    ? V11Endpoint.NotificationsMentions
+                    : V11Endpoint.NotificationsAll;
                 var response = await client.GetAsync(
-                    V11Endpoint.NotificationsAll,
+                    endpoint,
                     new RequestOptions { Params = parameters, Headers = client.BaseHeaders }).ConfigureAwait(false);
                 var json = response.Object ?? new JsonObject();
-                results = ItemsFromResponse(json);
+                results = ItemsFromResponse(json, includeTimelineTweets: notificationType == "mentions");
 
-                var nextCursor = BottomCursor(json);
-                lock (Gate)
+                if (!preserveCursor)
                 {
-                    if (nextCursor is not null && nextCursor != cursor)
+                    var nextCursor = BottomCursor(json);
+                    lock (Gate)
                     {
-                        _notificationsCursor = nextCursor;
-                        _notificationsExhausted = false;
-                    }
-                    else
-                    {
-                        _notificationsCursor = null;
-                        _notificationsExhausted = true;
+                        var state = StateFor(notificationType);
+                        if (nextCursor is not null && nextCursor != cursor)
+                        {
+                            state.Cursor = nextCursor;
+                            state.Exhausted = false;
+                        }
+                        else
+                        {
+                            state.Cursor = null;
+                            state.Exhausted = true;
+                        }
                     }
                 }
 
@@ -97,15 +132,19 @@ namespace WinUI3Twikit.Bridge
                 }
 
                 var replyCount = results.Count(item => item?["type"]?.GetValue<string>() == "reply");
-                Debug.WriteLine($"Notifications 取得: {results.Count} 件 (reply {replyCount})");
+                Debug.WriteLine($"Notifications 取得 ({notificationType}): {results.Count} 件 (reply {replyCount})");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Notifications取得エラー: {ex.Message}");
-                lock (Gate)
+                Debug.WriteLine($"Notifications取得エラー ({notificationType}): {ex.Message}");
+                if (!preserveCursor)
                 {
-                    _notificationsCursor = null;
-                    _notificationsExhausted = false;
+                    lock (Gate)
+                    {
+                        var state = StateFor(notificationType);
+                        state.Cursor = null;
+                        state.Exhausted = false;
+                    }
                 }
             }
 
@@ -272,7 +311,7 @@ namespace WinUI3Twikit.Bridge
             item["actor_profile_image"] = NonEmpty(user.Str("profile_image_url_https")) ?? user.Str("profile_image_url") ?? string.Empty;
         }
 
-        internal static JsonArray ItemsFromResponse(JsonObject response)
+        internal static JsonArray ItemsFromResponse(JsonObject response, bool includeTimelineTweets = false)
         {
             var globalObjects = response.Sub("globalObjects");
             var users = globalObjects.Sub("users");
@@ -330,41 +369,32 @@ namespace WinUI3Twikit.Bridge
                     }
 
                     var replyId = item.Sub("content").Sub("tweet").Str("id") ?? string.Empty;
-                    if (replyId.Length == 0 || seen.Contains(replyId))
+                    AddTweetCard(extracted, seen, tweets, users, replyId, "reply");
+                }
+            }
+
+            // @ツイートは notifications が無く、entryId が tweet-* の投稿そのもの。
+            if (includeTimelineTweets)
+            {
+                foreach (var instruction in response.Sub("timeline").ArrOrEmpty("instructions").Objects())
+                {
+                    foreach (var entry in instruction.Sub("addEntries").ArrOrEmpty("entries").Objects())
                     {
-                        continue;
+                        var entryId = entry.Str("entryId") ?? string.Empty;
+                        if (!entryId.StartsWith("tweet-", StringComparison.Ordinal))
+                        {
+                            continue;
+                        }
+
+                        var tweetId = entryId["tweet-".Length..];
+                        var tweet = tweets.Obj(tweetId);
+                        if (tweet is null || tweet.Count == 0)
+                        {
+                            continue;
+                        }
+
+                        AddTweetCard(extracted, seen, tweets, users, tweetId, IsDirectReply(tweet) ? "reply" : "mention");
                     }
-
-                    var tweet = tweets.Obj(replyId);
-                    if (tweet is null || tweet.Count == 0)
-                    {
-                        continue;
-                    }
-
-                    seen.Add(replyId);
-                    var timestampMs = TimestampMsFromTwitter(tweet.Str("created_at") ?? string.Empty);
-                    var user = users.Sub(tweet.Str("user_id_str") ?? string.Empty);
-                    var replyTo = ReplyToScreenName(tweet, users, tweets);
-
-                    var replyItem = new JsonObject
-                    {
-                        ["id"] = replyId,
-                        ["type"] = "reply",
-                        ["text"] = StripLeadingReplyMention(TweetSerializer.NormalizeText(TweetText(tweet)), replyTo),
-                        ["created_at"] = FormatTimestampMs(timestampMs),
-                        ["target_tweet_text"] = string.Empty,
-                        ["reply_count"] = TweetSerializer.MetricCount(tweet.Get("reply_count").AsLong()),
-                        ["retweet_count"] = TweetSerializer.MetricCount(tweet.Get("retweet_count").AsLong()),
-                        ["favorite_count"] = TweetSerializer.MetricCount(tweet.Get("favorite_count").AsLong()),
-                        ["view_count"] = ViewCount(tweet),
-                        ["is_liked"] = tweet.Get("favorited").IsTruthy(),
-                        ["is_retweeted"] = tweet.Get("retweeted").IsTruthy(),
-                        ["user_protected"] = user.Get("protected").IsTruthy(),
-                        ["user_verified"] = UserVerified(user),
-                        ["reply_to_screen_name"] = replyTo,
-                    };
-                    AddActor(replyItem, users, tweet.Str("user_id_str"));
-                    extracted.Add((timestampMs, replyItem));
                 }
             }
 
@@ -375,6 +405,69 @@ namespace WinUI3Twikit.Bridge
             }
 
             return array;
+        }
+
+        private static bool IsDirectReply(JsonObject tweet)
+        {
+            if (!string.IsNullOrEmpty(tweet.Str("in_reply_to_status_id_str"))
+                || !string.IsNullOrEmpty(tweet.Str("in_reply_to_status_id")))
+            {
+                return true;
+            }
+
+            var name = (tweet.Str("in_reply_to_screen_name") ?? string.Empty).Trim().TrimStart('@');
+            return name.Length > 0;
+        }
+
+        private static void AddTweetCard(
+            List<(long TimestampMs, JsonObject Item)> extracted,
+            HashSet<string> seen,
+            JsonObject tweets,
+            JsonObject users,
+            string tweetId,
+            string type)
+        {
+            if (tweetId.Length == 0 || seen.Contains(tweetId))
+            {
+                return;
+            }
+
+            var tweet = tweets.Obj(tweetId);
+            if (tweet is null || tweet.Count == 0)
+            {
+                return;
+            }
+
+            seen.Add(tweetId);
+            var isReply = string.Equals(type, "reply", StringComparison.Ordinal);
+            var timestampMs = TimestampMsFromTwitter(tweet.Str("created_at") ?? string.Empty);
+            var user = users.Sub(tweet.Str("user_id_str") ?? string.Empty);
+            var replyTo = isReply ? ReplyToScreenName(tweet, users, tweets) : string.Empty;
+            var text = TweetSerializer.NormalizeText(TweetText(tweet));
+            if (isReply)
+            {
+                text = StripLeadingReplyMention(text, replyTo);
+            }
+
+            var card = new JsonObject
+            {
+                ["id"] = tweetId,
+                ["type"] = isReply ? "reply" : "mention",
+                ["text"] = text,
+                ["created_at"] = FormatTimestampMs(timestampMs),
+                ["target_tweet_text"] = string.Empty,
+                ["reply_count"] = TweetSerializer.MetricCount(tweet.Get("reply_count").AsLong()),
+                ["retweet_count"] = TweetSerializer.MetricCount(tweet.Get("retweet_count").AsLong()),
+                ["favorite_count"] = TweetSerializer.MetricCount(tweet.Get("favorite_count").AsLong()),
+                ["view_count"] = ViewCount(tweet),
+                ["is_liked"] = tweet.Get("favorited").IsTruthy(),
+                ["is_retweeted"] = tweet.Get("retweeted").IsTruthy(),
+                ["user_protected"] = user.Get("protected").IsTruthy(),
+                ["user_verified"] = UserVerified(user),
+                ["reply_to_screen_name"] = replyTo,
+            };
+            AddActor(card, users, tweet.Str("user_id_str"));
+            extracted.Add((timestampMs, card));
         }
     }
 }

@@ -273,7 +273,9 @@ namespace WinUI3Twikit.Bridge
         private static async Task<HttpResponseMessage> Notifications(RouteContext ctx)
             => JsonResponses.Ok(await NotificationsService.GetNotificationsAsync(
                 ctx.Query.GetInt("count", 20),
-                ctx.Query.GetBool("refresh", true)).ConfigureAwait(false));
+                ctx.Query.GetBool("refresh", true),
+                ctx.Query.GetString("type"),
+                ctx.Query.GetBool("keepCursor", false)).ConfigureAwait(false));
 
         // --- リスト ---
         private static async Task<HttpResponseMessage> Lists(RouteContext ctx)

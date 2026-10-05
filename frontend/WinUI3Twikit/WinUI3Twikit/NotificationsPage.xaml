@@ -14,6 +14,26 @@
     </Page.Resources>
 
     <Grid Padding="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TabView x:Name="NotificationsTabView"
+                 TabWidthMode="SizeToContent"
+                 SelectedIndex="0"
+                 SelectionChanged="NotificationsTabView_SelectionChanged"
+                 IsAddTabButtonVisible="False"
+                 CanDragTabs="False"
+                 CanReorderTabs="False"
+                 Margin="12,1,12,4"
+                 Grid.Row="0">
+            <TabView.TabItems>
+                <TabViewItem Header="すべて" Tag="all" />
+                <TabViewItem Header="@ツイート" Tag="mentions" />
+            </TabView.TabItems>
+        </TabView>
+
         <!-- 読み込み中 -->
         <ProgressRing
             Width="60" Height="60"
@@ -21,6 +41,7 @@
             Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
             HorizontalAlignment="Center"
             VerticalAlignment="Center"
+            Grid.Row="1"
             IsIndeterminate="True"/>
 
         <!-- 通知リスト -->
@@ -29,7 +50,8 @@
                   Padding="8"
                   controls:TweetCard.HostActions="{x:Bind ViewModel}"
                   x:Name="NotificationsListView"
-                  Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                  Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource InverseBoolToVisibilityConverter}}"
+                  Grid.Row="1">
 
             <ListView.ItemsPanel>
                 <ItemsPanelTemplate>
@@ -46,7 +68,7 @@
                         <StackPanel Spacing="12">
                             <controls:TweetUserRow
                                 x:Name="ReplyUserRow"
-                                x:Load="{x:Bind IsReply, Mode=OneWay, FallbackValue=False}"
+                                x:Load="{x:Bind IsTweetCard, Mode=OneWay, FallbackValue=False}"
                                 UserName="{x:Bind ActorName, Mode=OneWay}"
                                 UserScreenName="{x:Bind ActorScreenNameDisplay, Mode=OneWay}"
                                 IsUserProtected="{x:Bind IsActorProtected, Mode=OneWay}"
@@ -104,14 +126,14 @@
 
                             <controls:TweetActionBar
                                 x:Name="ReplyActions"
-                                x:Load="{x:Bind IsReply, Mode=OneWay, FallbackValue=False}"
+                                x:Load="{x:Bind IsTweetCard, Mode=OneWay, FallbackValue=False}"
                                 Tweet="{x:Bind ActionTweet, Mode=OneWay}"/>
                         </StackPanel>
                     </Border>
 
                     <controls:TweetComposeForms
                         x:Name="ReplyCompose"
-                        x:Load="{x:Bind IsReply, Mode=OneWay, FallbackValue=False}"
+                        x:Load="{x:Bind IsTweetCard, Mode=OneWay, FallbackValue=False}"
                         Tweet="{x:Bind ActionTweet, Mode=OneWay}"/>
                     </StackPanel>
                 </DataTemplate>
