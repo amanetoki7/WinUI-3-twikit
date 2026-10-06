@@ -80,7 +80,7 @@ namespace WinUI3Twikit
 
         public void SetWindowTitle(string pageName)
         {
-            string appName = "WinUI 3 Twitter";  // ← アプリ名をここで統一管理
+            string appName = "WinUI 3 Twikit";  // ← アプリ名をここで統一管理
             string title = $"{pageName} / {appName}";
 
             IntPtr hwnd = WindowNative.GetWindowHandle(this);

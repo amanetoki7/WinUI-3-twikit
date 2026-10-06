@@ -35,8 +35,8 @@
       Executable="$targetnametoken$.exe"
       EntryPoint="$targetentrypoint$">
       <uap:VisualElements
-        DisplayName="WinUI 3 Twitter"
-        Description="WinUI 3 Twitter"
+        DisplayName="WinUI 3 Twikit"
+        Description="WinUi 3 + twikit"
         BackgroundColor="transparent"
         Square150x150Logo="Images\Square150x150Logo.png"
         Square44x44Logo="Images\Square44x44Logo.png">

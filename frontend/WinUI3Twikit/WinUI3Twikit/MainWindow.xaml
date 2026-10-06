@@ -10,7 +10,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="WinUI 3 Twitter">
+    Title="WinUI 3 Twikit">
 
     <win:Window.SystemBackdrop>
         <backdrop:MicaBackdrop />
@@ -84,7 +84,7 @@
         <tb:TaskbarIcon
             x:Name="TrayIcon"
             IconSource="ms-appx:///TwitterIcon48.ico"
-            ToolTipText="WinUI 3 Twitter"
+            ToolTipText="WinUI 3 Twikit"
             MenuActivation="LeftOrRightClick" />
     </muxc:Grid>
 </win:Window>
