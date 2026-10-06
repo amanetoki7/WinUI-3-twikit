@@ -311,6 +311,46 @@ namespace WinUI3Twikit.Bridge
             item["actor_profile_image"] = NonEmpty(user.Str("profile_image_url_https")) ?? user.Str("profile_image_url") ?? string.Empty;
         }
 
+        /// <summary>
+        /// X の通知 <c>icon</c> にある id。heart / retweet / person がいいね・リポスト・フォロー。
+        /// 一致しなければ unknown のままにし、表示側が本文で判別する。
+        /// </summary>
+        private static string AggregateType(JsonObject notification)
+        {
+            var icon = notification.Obj("icon");
+            if (icon is null)
+            {
+                return "unknown";
+            }
+
+            foreach (var kv in icon)
+            {
+                var fromIcon = TypeFromIconId(kv.Value.AsStr());
+                if (fromIcon is not null)
+                {
+                    return fromIcon;
+                }
+            }
+
+            return "unknown";
+        }
+
+        private static string? TypeFromIconId(string? iconId)
+        {
+            if (string.IsNullOrWhiteSpace(iconId))
+            {
+                return null;
+            }
+
+            return iconId.Trim().ToLowerInvariant() switch
+            {
+                "heart_icon" or "heart_plus_icon" => "like",
+                "retweet_icon" or "repost_icon" => "retweet",
+                "person_icon" => "follow",
+                _ => null
+            };
+        }
+
         internal static JsonArray ItemsFromResponse(JsonObject response, bool includeTimelineTweets = false)
         {
             var globalObjects = response.Sub("globalObjects");
@@ -348,7 +388,7 @@ namespace WinUI3Twikit.Bridge
                 var item = new JsonObject
                 {
                     ["id"] = notificationId,
-                    ["type"] = "unknown",
+                    ["type"] = AggregateType(notification),
                     ["text"] = TweetSerializer.NormalizeText(notification.Sub("message").Str("text") ?? string.Empty),
                     ["created_at"] = FormatTimestampMs(timestampMs),
                     ["target_tweet_text"] = TweetSerializer.NormalizeText(TweetText(target)),

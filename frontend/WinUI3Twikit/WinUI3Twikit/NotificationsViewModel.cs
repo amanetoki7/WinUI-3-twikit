@@ -416,6 +416,58 @@ namespace WinUI3Twikit
         public bool IsTweetCard => IsReply || IsMention;
         public bool ShowAggregateHeader => !IsTweetCard;
 
+        /// <summary>返信・メンションの本文には付けない。いいね・リポスト・フォローだけ。</summary>
+        private string Category => IsTweetCard ? string.Empty : NormalizeCategory(Type, Text);
+
+        public bool HasTypeIcon => Category is "like" or "retweet" or "follow";
+
+        public string IconGlyph => Category switch
+        {
+            "like" => "\uEB51",
+            "retweet" => "\uE72A",
+            "follow" => "\uE77B",
+            _ => string.Empty
+        };
+
+        public Brush IconForeground => Category switch
+        {
+            "like" => LikeBrush,
+            "retweet" => RetweetBrush,
+            _ => FollowBrush
+        };
+
+        private static readonly Brush LikeBrush = new SolidColorBrush(Microsoft.UI.Colors.Red);
+        private static readonly Brush RetweetBrush = new SolidColorBrush(Microsoft.UI.Colors.LimeGreen);
+        private static readonly Brush FollowBrush = new SolidColorBrush(Microsoft.UI.Colors.Gray);
+
+        private static string NormalizeCategory(string? type, string? text)
+        {
+            var normalizedType = type?.Trim().ToLowerInvariant();
+            if (normalizedType is "favorite" or "like") return "like";
+            if (normalizedType is "retweet" or "repost") return "retweet";
+            if (normalizedType is "follow") return "follow";
+
+            var normalizedText = text?.ToLowerInvariant() ?? string.Empty;
+            if (normalizedText.Contains("いいね") || normalizedText.Contains("お気に入り")
+                || normalizedText.Contains("liked") || normalizedText.Contains("favorite"))
+            {
+                return "like";
+            }
+
+            if (normalizedText.Contains("リツイート") || normalizedText.Contains("リポスト")
+                || normalizedText.Contains("retweeted") || normalizedText.Contains("reposted"))
+            {
+                return "retweet";
+            }
+
+            if (normalizedText.Contains("フォロー") || normalizedText.Contains("followed"))
+            {
+                return "follow";
+            }
+
+            return string.Empty;
+        }
+
         public string TypeText => Type?.ToLower() switch
         {
             "favorite" or "like" => "いいねしました",

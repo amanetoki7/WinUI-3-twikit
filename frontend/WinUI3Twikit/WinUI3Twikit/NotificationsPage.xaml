@@ -107,12 +107,29 @@
                                 </Grid>
                             </StackPanel>
 
-                            <!-- 通知本文 -->
-                            <TextBlock Text="{x:Bind Text}"
-                                       TextWrapping="WrapWholeWords"
-                                       FontSize="15"
-                                       LineHeight="20"
-                                       IsTextSelectionEnabled="True"/>
+                            <!-- 通知本文。いいね・リポスト・フォローだけ先頭にマークを付ける。 -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <FontIcon Grid.Column="0"
+                                          Glyph="{x:Bind IconGlyph, Mode=OneWay}"
+                                          Foreground="{x:Bind IconForeground, Mode=OneWay}"
+                                          FontSize="18"
+                                          Width="18"
+                                          Margin="0,1,8,0"
+                                          VerticalAlignment="Top"
+                                          Visibility="{x:Bind HasTypeIcon, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                                          AutomationProperties.AccessibilityView="Raw"/>
+                                <TextBlock Grid.Column="1"
+                                           Text="{x:Bind Text}"
+                                           TextWrapping="WrapWholeWords"
+                                           FontSize="15"
+                                           LineHeight="20"
+                                           IsTextSelectionEnabled="True"/>
+                            </Grid>
 
                             <!-- 対象ツイート。リプライは target が空なので出さない。 -->
                             <Border Visibility="{x:Bind HasTargetTweet, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
