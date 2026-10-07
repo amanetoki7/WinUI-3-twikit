@@ -19,10 +19,9 @@ namespace WinUI3Twikit
 
         public static IReadOnlyList<string> GetMediaPaths(TweetViewModel vm)
         {
-            return vm.QuoteMediaFiles
+            return [.. vm.QuoteMediaFiles
                 .Select(m => m.FilePath)
-                .Where(p => !string.IsNullOrWhiteSpace(p))
-                .ToArray();
+                .Where(p => !string.IsNullOrWhiteSpace(p))];
         }
 
         public static async Task TrySendAsync(

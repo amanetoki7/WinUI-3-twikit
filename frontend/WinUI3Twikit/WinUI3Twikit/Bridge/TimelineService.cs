@@ -161,7 +161,7 @@ namespace WinUI3Twikit.Bridge
                 if (page.Count == 0)
                 {
                     Debug.WriteLine("タイムラインが空です");
-                    return TweetsPayload(new JsonArray(), null);
+                    return TweetsPayload([], null);
                 }
 
                 results = SerializeUnique(page);
@@ -231,7 +231,7 @@ namespace WinUI3Twikit.Bridge
             if (page.Count == 0)
             {
                 Debug.WriteLine($"{label}が空です");
-                return TweetsPayload(new JsonArray(), null);
+                return TweetsPayload([], null);
             }
 
             var results = SerializeUnique(page);

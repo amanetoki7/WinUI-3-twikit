@@ -15,7 +15,7 @@ namespace WinUI3Twikit.Bridge
     /// ルーティングと各エンドポイントの実装は <see cref="LocalApi"/>（旧 <c>backend/api.py</c>）にある。
     /// それ以外の URL（画像など）は通常の <see cref="SocketsHttpHandler"/> へそのまま流す。
     /// </remarks>
-    internal sealed class BridgeHttpHandler : HttpMessageHandler
+    internal sealed partial class BridgeHttpHandler : HttpMessageHandler
     {
         /// <summary>旧バックエンドが待ち受けていたポート。ViewModel 側の URL と一致させる。</summary>
         public const int Port = 8000;

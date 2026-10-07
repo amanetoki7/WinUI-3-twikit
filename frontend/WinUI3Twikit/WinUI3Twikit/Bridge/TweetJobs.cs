@@ -7,17 +7,11 @@ using System.Text.Json.Nodes;
 namespace WinUI3Twikit.Bridge
 {
     /// <summary>添付メディア 1 件の進捗（<c>ComposeTweetControl</c> がポーリングで読む）。</summary>
-    internal sealed class MediaItemProgress
+    internal sealed class MediaItemProgress(string path, string fileName)
     {
-        public MediaItemProgress(string path, string fileName)
-        {
-            Path = path;
-            FileName = fileName;
-        }
+        public string Path { get; } = path;
 
-        public string Path { get; }
-
-        public string FileName { get; }
+        public string FileName { get; } = fileName;
 
         /// <summary>pending | waiting | uploading | processing | done | failed</summary>
         public string Phase { get; set; } = "pending";
@@ -37,20 +31,13 @@ namespace WinUI3Twikit.Bridge
     }
 
     /// <summary>投稿ジョブ。</summary>
-    internal sealed class TweetJob
+    internal sealed class TweetJob(string jobId, string text, List<MediaItemProgress> items)
     {
-        public TweetJob(string jobId, string text, List<MediaItemProgress> items)
-        {
-            JobId = jobId;
-            Text = text;
-            Items = items;
-        }
+        public string JobId { get; } = jobId;
 
-        public string JobId { get; }
+        public string Text { get; } = text;
 
-        public string Text { get; }
-
-        public List<MediaItemProgress> Items { get; }
+        public List<MediaItemProgress> Items { get; } = items;
 
         /// <summary>queued | running | succeeded | failed</summary>
         public string State { get; set; } = "queued";

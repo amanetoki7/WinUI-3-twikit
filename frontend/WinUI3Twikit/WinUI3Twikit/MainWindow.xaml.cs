@@ -16,6 +16,7 @@ using Windows.System;
 using Windows.UI;
 using Windows.UI.Core;
 using WinRT.Interop;
+using Microsoft.UI.Dispatching;
 
 namespace WinUI3Twikit
 {
@@ -24,6 +25,7 @@ namespace WinUI3Twikit
         private DispatcherTimer? _clockTimer;
         private PointerEventHandler? _contentPointerPressedHandler;
         private bool _composeDialogOpen;
+
 
         private void CustomizeWindow()
         {
@@ -55,7 +57,7 @@ namespace WinUI3Twikit
 
         private void ApplyTitleBarTheme(AppWindow appWindow)
         {
-            bool isLight = (Content as FrameworkElement)?.ActualTheme == ElementTheme.Light;
+            bool isLight = Content is FrameworkElement { ActualTheme: ElementTheme.Light };
 
             // ダークは従来どおり #202020、ライトは Mica のライト基調に近い #F3F3F3
             var background = isLight
@@ -113,6 +115,7 @@ namespace WinUI3Twikit
                 SetWindowTitle(info.Title);
             }
         }
+
 
         public MainWindow()
         {

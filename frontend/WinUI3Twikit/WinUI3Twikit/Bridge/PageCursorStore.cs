@@ -16,19 +16,14 @@ namespace WinUI3Twikit.Bridge
     /// このストアのトークンを返し、続きは <see cref="Result{T}.NextAsync"/> で取得する。
     /// ViewModel 側は <c>next_cursor</c> を不透明な文字列として扱うので変更は不要。
     /// </remarks>
-    internal sealed class PageCursorStore<T>
+    internal sealed class PageCursorStore<T>(int capacity = 256)
     {
         private const string TokenPrefix = "bridge:";
 
-        private readonly int _capacity;
+        private readonly int _capacity = capacity;
         private readonly object _gate = new();
         private readonly Dictionary<string, Result<T>> _pages = new(StringComparer.Ordinal);
         private readonly Queue<string> _order = new();
-
-        public PageCursorStore(int capacity = 256)
-        {
-            _capacity = capacity;
-        }
 
         public static bool IsToken(string? cursor)
             => cursor is not null && cursor.StartsWith(TokenPrefix, StringComparison.Ordinal);

@@ -34,16 +34,16 @@ namespace WinUI3Twikit.Bridge
             {
                 if (Request.Content is null)
                 {
-                    return new JsonObject();
+                    return [];
                 }
 
                 var text = await Request.Content.ReadAsStringAsync(CancellationToken).ConfigureAwait(false);
                 if (string.IsNullOrWhiteSpace(text))
                 {
-                    return new JsonObject();
+                    return [];
                 }
 
-                return JsonNode.Parse(text) as JsonObject ?? new JsonObject();
+                return JsonNode.Parse(text) as JsonObject ?? [];
             }
         }
 

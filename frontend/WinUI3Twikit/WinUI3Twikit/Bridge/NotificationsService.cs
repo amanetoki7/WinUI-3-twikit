@@ -103,7 +103,7 @@ namespace WinUI3Twikit.Bridge
                 var response = await client.GetAsync(
                     endpoint,
                     new RequestOptions { Params = parameters, Headers = client.BaseHeaders }).ConfigureAwait(false);
-                var json = response.Object ?? new JsonObject();
+                var json = response.Object ?? [];
                 results = ItemsFromResponse(json, includeTimelineTweets: notificationType == "mentions");
 
                 if (!preserveCursor)
@@ -194,8 +194,8 @@ namespace WinUI3Twikit.Bridge
                 var tz = parts[4];
                 var sign = tz.StartsWith('+') ? 1 : -1;
                 var offset = new TimeSpan(
-                    sign * int.Parse(tz.Substring(1, 2), CultureInfo.InvariantCulture),
-                    sign * int.Parse(tz.Substring(3, 2), CultureInfo.InvariantCulture),
+                    sign * int.Parse(tz.AsSpan(1, 2), CultureInfo.InvariantCulture),
+                    sign * int.Parse(tz.AsSpan(3, 2), CultureInfo.InvariantCulture),
                     0);
                 var dt = new DateTimeOffset(year, month, day, hour, minute, second, offset);
                 return dt.ToUnixTimeMilliseconds();
@@ -297,7 +297,7 @@ namespace WinUI3Twikit.Bridge
 
         private static void AddActor(JsonObject item, JsonObject users, string? userId)
         {
-            var user = string.IsNullOrEmpty(userId) ? new JsonObject() : users.Sub(userId);
+            var user = string.IsNullOrEmpty(userId) ? [] : users.Sub(userId);
             if (user.Count == 0)
             {
                 item["actor_name"] = "Unknown";
@@ -382,7 +382,7 @@ namespace WinUI3Twikit.Bridge
                 var userId = fromUsers.Count > 0 ? fromUsers[0].Sub("user").Str("id") : null;
                 var targetObjects = actions.ArrOrEmpty("targetObjects");
                 var targetId = targetObjects.Count > 0 ? targetObjects[0].Sub("tweet").Str("id") : null;
-                var target = string.IsNullOrEmpty(targetId) ? new JsonObject() : tweets.Sub(targetId);
+                var target = string.IsNullOrEmpty(targetId) ? [] : tweets.Sub(targetId);
                 var timestampMs = notification.Get("timestampMs").AsLong() ?? 0;
 
                 var item = new JsonObject

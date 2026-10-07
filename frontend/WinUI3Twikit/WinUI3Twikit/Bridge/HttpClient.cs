@@ -19,7 +19,7 @@ namespace WinUI3Twikit
     /// 本物の <see cref="System.Net.Http.HttpClient"/> と同じ感覚で使える。
     /// </para>
     /// </remarks>
-    public class HttpClient : System.Net.Http.HttpClient
+    public partial class HttpClient : System.Net.Http.HttpClient
     {
         /// <summary>twikit-dotnet ブリッジを経由するクライアント。</summary>
         public HttpClient()

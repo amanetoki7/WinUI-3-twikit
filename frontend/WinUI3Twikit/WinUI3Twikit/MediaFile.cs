@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 
 namespace WinUI3Twikit
 {
-    public class MediaFile : INotifyPropertyChanged
+    public partial class MediaFile : INotifyPropertyChanged
     {
         public string FilePath { get; set; } = string.Empty;
 

@@ -5,7 +5,7 @@ using System.ComponentModel;
 
 namespace WinUI3Twikit
 {
-    public sealed class TweetCollection : ObservableCollection<TweetViewModel>
+    public sealed partial class TweetCollection : ObservableCollection<TweetViewModel>
     {
         public void Reset(IReadOnlyList<TweetViewModel> items)
         {
