@@ -1,6 +1,6 @@
-using WinUI3Twikit.Controls;
 using H.NotifyIcon;
 using Microsoft.UI;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -16,7 +16,7 @@ using Windows.System;
 using Windows.UI;
 using Windows.UI.Core;
 using WinRT.Interop;
-using Microsoft.UI.Dispatching;
+using WinUI3Twikit.Controls;
 
 namespace WinUI3Twikit
 {
