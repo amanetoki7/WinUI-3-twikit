@@ -142,7 +142,8 @@ namespace WinUI3Twikit.Bridge
                 }
 
                 var replyCount = results.Count(item => item?["type"]?.GetValue<string>() == "reply");
-                Debug.WriteLine($"Notifications 取得 ({notificationType}): {results.Count} 件 (reply {replyCount})");
+                var quoteCount = results.Count(item => item?["type"]?.GetValue<string>() == "quote");
+                Debug.WriteLine($"Notifications 取得 ({notificationType}): {results.Count} 件 (reply {replyCount}, quote {quoteCount})");
             }
             catch (Exception ex)
             {
@@ -269,10 +270,17 @@ namespace WinUI3Twikit.Bridge
             }
 
             var user = users.Sub(quoted.Str("user_id_str") ?? quoted.Str("user_id") ?? string.Empty);
+            var quotedText = TweetSerializer.NormalizeText(TweetText(quoted));
+            quotedText = StripMediaUrls(quotedText, quoted);
+            if (HasRawQuote(quoted))
+            {
+                quotedText = StripQuotedUrl(quotedText, quoted);
+            }
+
             return new JsonObject
             {
                 ["id"] = quoted.Str("id") ?? quotedId ?? string.Empty,
-                ["text"] = TweetSerializer.NormalizeText(TweetText(quoted)),
+                ["text"] = quotedText,
                 ["created_at"] = FormatTimestampMs(TimestampMsFromTwitter(quoted.Str("created_at") ?? string.Empty)),
                 ["user_name"] = user.Str("name") ?? "Unknown",
                 ["user_screen_name"] = user.Str("screen_name") ?? string.Empty,
@@ -442,23 +450,35 @@ namespace WinUI3Twikit.Bridge
                 extracted.Add((timestampMs, item));
             }
 
-            // リプライは notifications 辞書に入らず、timeline の tweet entry として届く。
+            // リプライ・引用ツイート・メンションは timeline の tweet entry として届く。
             foreach (var instruction in response.Sub("timeline").ArrOrEmpty("instructions").Objects())
             {
                 foreach (var entry in instruction.Sub("addEntries").ArrOrEmpty("entries").Objects())
                 {
                     var item = entry.Sub("content").Sub("item");
-                    if (item.Sub("clientEventInfo").Str("element") != "user_replied_to_your_tweet")
+                    var tweetId = item.Sub("content").Sub("tweet").Str("id") ?? string.Empty;
+                    if (string.IsNullOrEmpty(tweetId))
                     {
                         continue;
                     }
 
-                    var replyId = item.Sub("content").Sub("tweet").Str("id") ?? string.Empty;
-                    AddTweetCard(extracted, seen, tweets, users, replyId, "reply");
+                    var element = item.Sub("clientEventInfo").Str("element");
+                    if (element == "user_replied_to_your_tweet")
+                    {
+                        AddTweetCard(extracted, seen, tweets, users, tweetId, "reply");
+                    }
+                    else if (element == "user_quoted_your_tweet")
+                    {
+                        AddTweetCard(extracted, seen, tweets, users, tweetId, "quote");
+                    }
+                    else if (element == "user_mentioned_you")
+                    {
+                        AddTweetCard(extracted, seen, tweets, users, tweetId, "mention");
+                    }
                 }
             }
 
-            // @ツイートは notifications が無く、entryId が tweet-* の投稿そのもの。
+            // @ツイートの旧形式やフォールバック（entryId が tweet-* の投稿そのもの）
             if (includeTimelineTweets)
             {
                 foreach (var instruction in response.Sub("timeline").ArrOrEmpty("instructions").Objects())
@@ -504,6 +524,58 @@ namespace WinUI3Twikit.Bridge
             return name.Length > 0;
         }
 
+        private static string StripQuotedUrl(string text, JsonObject tweet)
+        {
+            var quotedId = tweet.Str("quoted_status_id_str") ?? tweet.Str("quoted_status_id");
+            if (string.IsNullOrEmpty(quotedId) || string.IsNullOrEmpty(text))
+            {
+                return text;
+            }
+
+            foreach (var u in tweet.Sub("entities").ArrOrEmpty("urls").Objects())
+            {
+                var expanded = u.Str("expanded_url") ?? string.Empty;
+                if (expanded.Contains($"/status/{quotedId}", StringComparison.OrdinalIgnoreCase))
+                {
+                    var shortUrl = u.Str("url");
+                    if (!string.IsNullOrEmpty(shortUrl))
+                    {
+                        text = text.Replace(shortUrl, string.Empty);
+                    }
+                }
+            }
+
+            return text.Trim();
+        }
+
+        private static string StripMediaUrls(string text, JsonObject tweet)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return text;
+            }
+
+            foreach (var m in tweet.Sub("extended_entities").ArrOrEmpty("media").Objects())
+            {
+                var mediaUrl = m.Str("url");
+                if (!string.IsNullOrEmpty(mediaUrl))
+                {
+                    text = text.Replace(mediaUrl, string.Empty);
+                }
+            }
+
+            foreach (var m in tweet.Sub("entities").ArrOrEmpty("media").Objects())
+            {
+                var mediaUrl = m.Str("url");
+                if (!string.IsNullOrEmpty(mediaUrl))
+                {
+                    text = text.Replace(mediaUrl, string.Empty);
+                }
+            }
+
+            return text.Trim();
+        }
+
         private static void AddTweetCard(
             List<(long TimestampMs, JsonObject Item)> extracted,
             HashSet<string> seen,
@@ -525,6 +597,7 @@ namespace WinUI3Twikit.Bridge
 
             seen.Add(tweetId);
             var isReply = string.Equals(type, "reply", StringComparison.Ordinal);
+            var isQuote = string.Equals(type, "quote", StringComparison.Ordinal);
             var timestampMs = TimestampMsFromTwitter(tweet.Str("created_at") ?? string.Empty);
             var user = users.Sub(tweet.Str("user_id_str") ?? string.Empty);
             var replyTo = isReply ? ReplyToScreenName(tweet, users, tweets) : string.Empty;
@@ -534,10 +607,17 @@ namespace WinUI3Twikit.Bridge
                 text = StripLeadingReplyMention(text, replyTo);
             }
 
+            if (isQuote || HasRawQuote(tweet))
+            {
+                text = StripQuotedUrl(text, tweet);
+            }
+
+            text = StripMediaUrls(text, tweet);
+
             var card = new JsonObject
             {
                 ["id"] = tweetId,
-                ["type"] = isReply ? "reply" : "mention",
+                ["type"] = type,
                 ["text"] = text,
                 ["created_at"] = FormatTimestampMs(timestampMs),
                 ["target_tweet_text"] = string.Empty,

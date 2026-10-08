@@ -416,7 +416,8 @@ namespace WinUI3Twikit
         public TweetViewModel? ActionTweet { get; set; }
         public bool IsReply => string.Equals(Type, "reply", StringComparison.OrdinalIgnoreCase);
         public bool IsMention => string.Equals(Type, "mention", StringComparison.OrdinalIgnoreCase);
-        public bool IsTweetCard => IsReply || IsMention;
+        public bool IsQuote => string.Equals(Type, "quote", StringComparison.OrdinalIgnoreCase);
+        public bool IsTweetCard => IsReply || IsMention || IsQuote;
         public bool ShowAggregateHeader => !IsTweetCard;
 
         /// <summary>返信・メンションの本文には付けない。いいね・リポスト・フォローだけ。</summary>
@@ -476,6 +477,7 @@ namespace WinUI3Twikit
             "favorite" or "like" => "いいねしました",
             "retweet" or "repost" => "リポストしました",
             "reply" => "返信しました",
+            "quote" => "引用しました",
             "follow" => "フォローしました",
             _ => Type ?? "通知"
         };
