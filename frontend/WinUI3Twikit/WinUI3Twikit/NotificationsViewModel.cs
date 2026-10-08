@@ -199,24 +199,25 @@ namespace WinUI3Twikit
 
                         if (vm.IsTweetCard)
                         {
-                            vm.ActionTweet = new TweetViewModel
+                            vm.ActionTweet = TweetViewModel.FromDto(new TweetDto
                             {
-                                Id = vm.Id,
-                                Text = vm.Text,
-                                UserName = vm.ActorName,
-                                UserScreenName = string.IsNullOrEmpty(vm.ActorScreenName)
-                                    ? string.Empty
-                                    : "@" + vm.ActorScreenName,
-                                CreatedAt = vm.CreatedAt,
-                                ReplyCount = dto.reply_count,
-                                RetweetCount = dto.retweet_count,
-                                FavoriteCount = dto.favorite_count,
-                                ViewCount = dto.view_count,
-                                IsLiked = dto.is_liked,
-                                IsRetweeted = dto.is_retweeted,
-                                IsUserProtected = dto.user_protected,
-                                IsUserVerified = dto.user_verified,
-                            };
+                                id = dto.id,
+                                text = dto.text,
+                                user_name = dto.actor_name,
+                                user_screen_name = dto.actor_screen_name,
+                                user_profile_image = dto.actor_profile_image,
+                                created_at = dto.created_at,
+                                reply_count = dto.reply_count,
+                                retweet_count = dto.retweet_count,
+                                favorite_count = dto.favorite_count,
+                                view_count = dto.view_count,
+                                is_liked = dto.is_liked,
+                                is_retweeted = dto.is_retweeted,
+                                user_protected = dto.user_protected,
+                                user_verified = dto.user_verified,
+                                media_items = dto.media_items,
+                                quoted_tweet = dto.quoted_tweet,
+                            });
                         }
 
                         if (!string.IsNullOrEmpty(dto.actor_profile_image))
@@ -388,6 +389,8 @@ namespace WinUI3Twikit
         public bool user_protected { get; set; }
         public bool user_verified { get; set; }
         public string? reply_to_screen_name { get; set; }
+        public List<MediaItemDto>? media_items { get; set; }
+        public QuotedTweetDto? quoted_tweet { get; set; }
     }
 
     public partial class NotificationViewModel : INotifyPropertyChanged

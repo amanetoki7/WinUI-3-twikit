@@ -254,6 +254,41 @@ namespace WinUI3Twikit.Bridge
 
         private static string? NonEmpty(string? value) => string.IsNullOrEmpty(value) ? null : value;
 
+        private static JsonObject RawQuoteToDict(JsonObject tweet, JsonObject tweets, JsonObject users)
+        {
+            var quotedId = tweet.Str("quoted_status_id_str")
+                ?? tweet.Str("quoted_status_id")
+                ?? tweet.Sub("quoted_status").Str("id");
+            var quoted = string.IsNullOrEmpty(quotedId)
+                ? tweet.Sub("quoted_status")
+                : tweets.Obj(quotedId) ?? tweet.Sub("quoted_status");
+
+            if (quoted.Count == 0)
+            {
+                return new JsonObject { ["is_unavailable"] = true };
+            }
+
+            var user = users.Sub(quoted.Str("user_id_str") ?? quoted.Str("user_id") ?? string.Empty);
+            return new JsonObject
+            {
+                ["id"] = quoted.Str("id") ?? quotedId ?? string.Empty,
+                ["text"] = TweetSerializer.NormalizeText(TweetText(quoted)),
+                ["created_at"] = FormatTimestampMs(TimestampMsFromTwitter(quoted.Str("created_at") ?? string.Empty)),
+                ["user_name"] = user.Str("name") ?? "Unknown",
+                ["user_screen_name"] = user.Str("screen_name") ?? string.Empty,
+                ["user_profile_image"] = user.Str("profile_image_url_https") ?? user.Str("profile_image_url") ?? string.Empty,
+                ["user_protected"] = user.Get("protected").IsTruthy(),
+                ["user_verified"] = UserVerified(user),
+                ["media_items"] = TweetSerializer.ExtractMedia(quoted),
+                ["is_unavailable"] = false,
+            };
+        }
+
+        private static bool HasRawQuote(JsonObject tweet)
+            => !string.IsNullOrEmpty(tweet.Str("quoted_status_id_str"))
+               || !string.IsNullOrEmpty(tweet.Str("quoted_status_id"))
+               || tweet.Sub("quoted_status").Count > 0;
+
         /// <summary>返信先として別行に出す @ユーザー名を、本文先頭から外す。</summary>
         private static string StripLeadingReplyMention(string text, string screenName)
         {
@@ -515,7 +550,12 @@ namespace WinUI3Twikit.Bridge
                 ["user_protected"] = user.Get("protected").IsTruthy(),
                 ["user_verified"] = UserVerified(user),
                 ["reply_to_screen_name"] = replyTo,
+                ["media_items"] = TweetSerializer.ExtractMedia(tweet),
             };
+            if (HasRawQuote(tweet))
+            {
+                card["quoted_tweet"] = RawQuoteToDict(tweet, tweets, users);
+            }
             AddActor(card, users, tweet.Str("user_id_str"));
             extracted.Add((timestampMs, card));
         }

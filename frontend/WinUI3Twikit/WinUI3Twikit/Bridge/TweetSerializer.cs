@@ -100,17 +100,21 @@ namespace WinUI3Twikit.Bridge
 
         public static JsonArray ExtractMedia(Tweet tweet)
         {
+            return ExtractMedia(tweet.Legacy);
+        }
+
+        internal static JsonArray ExtractMedia(JsonObject tweet)
+        {
             var mediaItems = new JsonArray();
             var seenUrls = new HashSet<string>(StringComparer.Ordinal);
             try
             {
-                var legacy = tweet.Legacy;
-                foreach (var m in legacy.Sub("extended_entities").ArrOrEmpty("media").Objects())
+                foreach (var m in tweet.Sub("extended_entities").ArrOrEmpty("media").Objects())
                 {
                     AppendMediaEntry(mediaItems, seenUrls, m);
                 }
 
-                foreach (var m in legacy.Sub("entities").ArrOrEmpty("media").Objects())
+                foreach (var m in tweet.Sub("entities").ArrOrEmpty("media").Objects())
                 {
                     AppendMediaEntry(mediaItems, seenUrls, m);
                 }

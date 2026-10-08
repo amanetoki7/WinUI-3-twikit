@@ -141,6 +141,11 @@
                                            IsTextSelectionEnabled="True"/>
                             </Border>
 
+                            <controls:QuotedTweetCard
+                                x:Name="QuotedTweetPresenter"
+                                x:Load="{x:Bind ActionTweet.HasQuotedTweet, Mode=OneWay, FallbackValue=False}"
+                                Tweet="{x:Bind ActionTweet, Mode=OneWay}"/>
+
                             <controls:TweetActionBar
                                 x:Name="ReplyActions"
                                 x:Load="{x:Bind IsTweetCard, Mode=OneWay, FallbackValue=False}"
