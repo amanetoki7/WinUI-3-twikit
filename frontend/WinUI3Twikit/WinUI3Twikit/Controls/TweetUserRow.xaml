@@ -19,8 +19,8 @@
         </Grid.ColumnDefinitions>
 
         <PersonPicture Grid.Column="0"
-                       Width="48"
-                       Height="48"
+                       Width="40"
+                       Height="40"
                        VerticalAlignment="Center"
                        ProfilePicture="{x:Bind UserProfileImage, Mode=OneWay}"
                        Tapped="ProfileImage_Tapped"

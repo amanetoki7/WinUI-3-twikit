@@ -82,7 +82,7 @@
                             <StackPanel x:Name="AggregateHeader"
                                         x:Load="{x:Bind ShowAggregateHeader, Mode=OneWay, FallbackValue=True}"
                                         Orientation="Horizontal" Spacing="12">
-                                <PersonPicture Width="48" Height="48" ProfilePicture="{x:Bind ActorProfileImage, Mode=OneWay}"/>
+                                <PersonPicture Width="40" Height="40" ProfilePicture="{x:Bind ActorProfileImage, Mode=OneWay}"/>
 
                                 <Grid HorizontalAlignment="Stretch">
                                     <Grid.ColumnDefinitions>
