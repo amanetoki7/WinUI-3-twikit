@@ -1,12 +1,12 @@
 # WinUI-3-twikit
 
-**English summary:** A WinUI 3 desktop client for X (Twitter), backed by [twikit-dotnet](https://github.com/amanetoki7/twikit-dotnet) (a C# port of twikit) running in-process. No Python and no local HTTP server are needed anymore. Supports timelines, search, notifications, lists, posting, and queued tweet actions (like / retweet / reply). Requires Windows 10+, .NET 8 SDK, and Visual Studio 2022 or later with the WinUI workload. Quick start: clone this repository and `twikit-dotnet` side by side → copy `data/cookies.example.json` to `data/cookies.json` and fill in your cookies → build and run.
+**English summary:** A WinUI 3 desktop client for X (Twitter), backed by [twikit-dotnet](https://github.com/amanetoki7/twikit-dotnet) (a C# port of twikit) running in-process. No Python and no local HTTP server are needed anymore. Supports timelines, search, notifications, lists, posting, and queued tweet actions (like / retweet / reply). Requires Windows 10+, .NET 8 SDK, and Visual Studio 2022 or later with the WinUI workload. Quick start: clone this repository with `--recurse-submodules` (`twikit-dotnet` is a git submodule) → copy `data/cookies.example.json` to `data/cookies.json` and fill in your cookies → build and run.
 
 ---
 
 WinUI 3 で動作する X（旧 Twitter）クライアントです。X との通信は [twikit-dotnet](https://github.com/amanetoki7/twikit-dotnet)（Python 製 twikit の C# 移植）をアプリ内で直接呼び出して行います。以前のバージョンにあった Python / FastAPI の橋渡しサーバーは不要になりました。
 
-> **twikit-dotnet について:** 本プロジェクトは [amanetoki7/twikit-dotnet](https://github.com/amanetoki7/twikit-dotnet) をプロジェクト参照で取り込みます。NuGet には公開されていないため、このリポジトリの**隣**（`..\twikit-dotnet`）に clone してください。別の場所に置く場合は環境変数 `TWIKIT_DOTNET_DIR` でパスを指定できます。
+> **twikit-dotnet について:** 本プロジェクトは [amanetoki7/twikit-dotnet](https://github.com/amanetoki7/twikit-dotnet) をプロジェクト参照で取り込みます。NuGet には公開されていないため、リポジトリ直下の `twikit-dotnet/` に **git submodule** として含めています。clone 時に `--recurse-submodules` を付けるか、clone 後に `git submodule update --init --recursive` を実行してください。別の checkout を使う場合は環境変数 `TWIKIT_DOTNET_DIR` でパスを上書きできます。
 
 > **注意:** これは非公式クライアントです。X の仕様変更により予告なく動作しなくなる可能性があります。利用は自己責任でお願いします。
 
@@ -89,7 +89,7 @@ flowchart LR
 | OS | Windows 10 バージョン 1809 以降 |
 | .NET | **.NET 8 SDK**（必須。プロジェクトは `net8.0` をターゲット） |
 | IDE | **Visual Studio 2022 以降** +「Windows アプリ開発」ワークロード（WinUI 3） |
-| twikit-dotnet | [amanetoki7/twikit-dotnet](https://github.com/amanetoki7/twikit-dotnet) をこのリポジトリの隣に clone（`.NET 8` でビルドされ、依存パッケージ AngleSharp / Jint は NuGet から自動復元） |
+| twikit-dotnet | [amanetoki7/twikit-dotnet](https://github.com/amanetoki7/twikit-dotnet) を git submodule（`twikit-dotnet/`）として取得（`.NET 8` でビルドされ、依存パッケージ AngleSharp / Jint は NuGet から自動復元） |
 
 Python、pip、uvicorn は不要です。
 
@@ -106,7 +106,7 @@ Visual Studio の**マイナーバージョンが開発環境と異なっても*
 
 - .NET 8 SDK が未インストール
 - WinUI 3 ワークロードが未インストール
-- `twikit-dotnet` が隣のディレクトリに clone されていない（または `TWIKIT_DOTNET_DIR` が未設定）
+- `twikit-dotnet` サブモジュールが初期化されていない（`twikit-dotnet/` が空。`git submodule update --init --recursive` を実行）
 - `data/cookies.json` が未作成、またはトークン期限切れ
 
 ## リポジトリ構成
@@ -120,10 +120,10 @@ WinUI-3-twikit/
 │   │   ├── ServerManager.cs        # 起動時のログイン確認・再起動（公開 API は以前のまま）
 │   │   └── ...                     # ページ・ViewModel（変更なし）
 │   └── WinUI3Twikit (Package)/     # MSIX パッケージ
+├── twikit-dotnet/          # git submodule（amanetoki7/twikit-dotnet。src/Twikit/Twikit.csproj を参照）
 ├── data/
 │   └── cookies.example.json  # 認証情報テンプレート
 └── static/                 # favicon 等
-..\twikit-dotnet/           # 隣に clone する（src/Twikit/Twikit.csproj を参照）
 ```
 
 ## ブリッジが処理するパス（旧 API 互換）
@@ -152,15 +152,20 @@ ViewModel が使う URL は以前の FastAPI 版と同じです。実装は `Bri
 
 ### 1. リポジトリの取得
 
-このリポジトリと twikit-dotnet を同じ親ディレクトリに clone します。
+twikit-dotnet は git submodule として含まれているため、`--recurse-submodules` を付けて clone します。
 
 ```powershell
-git clone https://github.com/yukari-557fd8/WinUI-3-twikit.git
-git clone https://github.com/amanetoki7/twikit-dotnet.git
+git clone --recurse-submodules https://github.com/yukari-557fd8/WinUI-3-twikit.git
 cd WinUI-3-twikit
 ```
 
-twikit-dotnet を別の場所に置く場合は、環境変数 `TWIKIT_DOTNET_DIR` にそのディレクトリ（`src/Twikit/Twikit.csproj` を含む）を設定してください。
+すでに clone 済みで `twikit-dotnet/` が空の場合は、リポジトリ直下で次を実行します。
+
+```powershell
+git submodule update --init --recursive
+```
+
+twikit-dotnet の参照先コミットを進めるには `git submodule update --remote twikit-dotnet` を実行し、変更された `twikit-dotnet` を commit します。別の checkout を使いたい場合は、環境変数 `TWIKIT_DOTNET_DIR` にそのディレクトリ（`src/Twikit/Twikit.csproj` を含む）を設定すると上書きできます。
 
 ### 2. 認証情報の準備
 
@@ -229,7 +234,7 @@ dotnet publish frontend\WinUI3Twikit\WinUI3Twikit\WinUI3Twikit.csproj -c Release
 | 症状 | 原因 | 対処 |
 |---|---|---|
 | ビルドエラー（WinUI / SDK 関連） | .NET 8 SDK または WinUI ワークロード未導入 | [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) をインストールし、VS インストーラーで「Windows アプリ開発」を追加 |
-| ビルドエラー `Twikit.csproj が見つかりません` | twikit-dotnet が隣に clone されていない | `..\twikit-dotnet` に clone するか、環境変数 `TWIKIT_DOTNET_DIR` を設定する |
+| ビルドエラー `twikit-dotnet が見つかりません` / `Twikit.csproj が見つかりません` | サブモジュールが初期化されていない（`twikit-dotnet/` が空） | リポジトリ直下で `git submodule update --init --recursive` を実行する（別の場所を使う場合は環境変数 `TWIKIT_DOTNET_DIR` を設定） |
 | `Twikit: cookies.json がありません ❌` | `data/cookies.json` が未作成 | `cookies.example.json` をコピーして値を入力し、設定画面で「サーバーを再起動」 |
 | `Twikit: Cookie が無効です ❌` | トークンの期限切れ・誤り | ブラウザから cookie を再取得し、設定画面で更新する |
 | `Twikit: 接続失敗 ❌` | ネットワーク、または X 側の制限 | 接続を確認して「サーバーを再起動」。Cloudflare 等に拒否される場合は時間を置く |
@@ -238,7 +243,7 @@ dotnet publish frontend\WinUI3Twikit\WinUI3Twikit\WinUI3Twikit.csproj -c Release
 
 ## リリース（GitHub Actions）
 
-[.github/workflows/release.yml](.github/workflows/release.yml) は `v*` 形式のタグを push すると起動し、`windows-latest` 上で twikit-dotnet（`amanetoki7/twikit-dotnet` の `main`）を隣に checkout して単一 exe を publish し、GitHub Release を作成して `WinUI3Twikit-<タグ>-win-x64.exe` と SHA-256 を添付します。リリースノートはコミット履歴から自動生成されます。
+[.github/workflows/release.yml](.github/workflows/release.yml) は `v*` 形式のタグを push すると起動し、`windows-latest` 上で twikit-dotnet サブモジュールごと checkout して単一 exe を publish し、GitHub Release を作成して `WinUI3Twikit-<タグ>-win-x64.exe` と SHA-256 を添付します。リリースノートはコミット履歴から自動生成されます。
 
 ```powershell
 git tag v1.0.0
@@ -248,7 +253,7 @@ git push origin v1.0.0
 - タグが `v1.2.3` 形式のとき、exe のバージョン情報（`-p:Version`）にも反映されます
 - `v1.2.3-beta.1` のようにハイフンを含むタグはプレリリースになります
 - Actions タブから手動実行（workflow_dispatch）した場合は Release を作らず、Artifacts に exe を置きます
-- twikit-dotnet の参照先を変えるには、ワークフロー先頭の `TWIKIT_DOTNET_REPO` / `TWIKIT_DOTNET_REF` を編集します
+- twikit-dotnet はサブモジュールが指すコミットでビルドされます。更新するには `git submodule update --remote twikit-dotnet` で進めて commit します
 
 ## セキュリティ
 

@@ -1,7 +1,7 @@
 # タグ（v1.2.3 など）を push すると、自己完結型の単一 exe を publish して GitHub Release に添付する。
 # 手動実行（workflow_dispatch）では Release を作らず、Artifacts に exe を置くだけ。
 #
-# ローカルで同じものを作るには（PowerShell、twikit-dotnet はこのリポジトリの隣に clone）:
+# ローカルで同じものを作るには（PowerShell、twikit-dotnet は submodule なので事前に `git submodule update --init --recursive`）:
 #   dotnet publish frontend\WinUI3Twikit\WinUI3Twikit\WinUI3Twikit.csproj -c Release -r win-x64 --self-contained true `
 #     -p:Platform=x64 -p:PublishSingleFile=true -o publish\win-x64
 name: release
@@ -19,10 +19,7 @@ env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
-  # twikit-dotnet（twikit の C# 移植）。NuGet には無いので、ローカル開発と同じくリポジトリの隣に clone して参照する。
-  TWIKIT_DOTNET_REPO: amanetoki7/twikit-dotnet
-  TWIKIT_DOTNET_REF: main
-  PROJECT: WinUI-3-twikit/frontend/WinUI3Twikit/WinUI3Twikit/WinUI3Twikit.csproj
+  PROJECT: frontend/WinUI3Twikit/WinUI3Twikit/WinUI3Twikit.csproj
 
 jobs:
   publish:
@@ -34,17 +31,12 @@ jobs:
           - platform: x64
             rid: win-x64
     steps:
-      - name: Checkout WinUI-3-twikit
+      # twikit-dotnet（twikit の C# 移植）は NuGet に無いので git submodule（twikit-dotnet/）として取り込んでいる。
+      # ビルドされるのは submodule が指すコミット。更新するには `git submodule update --remote twikit-dotnet` して commit する。
+      - name: Checkout (with twikit-dotnet submodule)
         uses: actions/checkout@v4
         with:
-          path: WinUI-3-twikit
-
-      - name: Checkout twikit-dotnet (sibling directory, same layout as local development)
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.TWIKIT_DOTNET_REPO }}
-          ref: ${{ env.TWIKIT_DOTNET_REF }}
-          path: twikit-dotnet
+          submodules: recursive
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -68,8 +60,6 @@ jobs:
 
       - name: Publish single-file exe
         shell: pwsh
-        env:
-          TWIKIT_DOTNET_DIR: ${{ github.workspace }}\twikit-dotnet
         run: |
           $props = @(
             "-p:Platform=${{ matrix.platform }}",

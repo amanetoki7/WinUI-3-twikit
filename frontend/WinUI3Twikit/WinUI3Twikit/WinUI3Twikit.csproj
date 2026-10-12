@@ -43,17 +43,23 @@
 
     <!--
       twikit-dotnet（twikit の C# 移植。Python バックエンドの代わりに Bridge/ から直接呼び出す）。
-      既定ではこのリポジトリの隣（..\twikit-dotnet）に clone されている前提。
-      別の場所にある場合は環境変数 TWIKIT_DOTNET_DIR か MSBuild プロパティ TwikitDotnetDir で指定する。
+      リポジトリ直下の twikit-dotnet/ に git submodule として取り込んでいる（clone 後に submodule の初期化が必要。README 参照）。
+      別の checkout を使う場合は環境変数 TWIKIT_DOTNET_DIR か MSBuild プロパティ TwikitDotnetDir で上書きする。
     -->
     <PropertyGroup>
         <TwikitDotnetDir Condition="'$(TwikitDotnetDir)' == '' and '$(TWIKIT_DOTNET_DIR)' != ''">$([MSBuild]::EnsureTrailingSlash('$(TWIKIT_DOTNET_DIR)'))</TwikitDotnetDir>
-        <TwikitDotnetDir Condition="'$(TwikitDotnetDir)' == ''">$(MSBuildThisFileDirectory)..\..\..\..\twikit-dotnet\</TwikitDotnetDir>
+        <TwikitDotnetDir Condition="'$(TwikitDotnetDir)' == ''">$(MSBuildThisFileDirectory)..\..\..\twikit-dotnet\</TwikitDotnetDir>
+        <TwikitProjectPath>$(TwikitDotnetDir)src\Twikit\Twikit.csproj</TwikitProjectPath>
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="$(TwikitDotnetDir)src\Twikit\Twikit.csproj" />
+        <ProjectReference Include="$(TwikitProjectPath)" />
     </ItemGroup>
+
+    <!-- submodule が未初期化（twikit-dotnet/ が空）のときは、MSB3202 より先に対処方法付きのエラーで止める -->
+    <Target Name="CheckTwikitDotnetSubmodule" BeforeTargets="Restore;Build" Condition="!Exists('$(TwikitProjectPath)')">
+        <Error Text="twikit-dotnet が見つかりません: $(TwikitProjectPath)。リポジトリ直下で `git submodule update --init --recursive` を実行してください（別の場所を使う場合は環境変数 TWIKIT_DOTNET_DIR を設定）。" />
+    </Target>
 
     <!--
       単一 exe の publish 用（GitHub Actions の release ワークフローと同じ）:
