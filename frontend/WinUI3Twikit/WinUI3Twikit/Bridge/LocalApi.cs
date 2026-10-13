@@ -351,10 +351,13 @@ namespace WinUI3Twikit.Bridge
         {
             try
             {
+                // type: tweets / replies / retweets / media（省略時は従来どおり絞り込みなし）、media: photo / video
                 return JsonResponses.Ok(await TimelineService.GetUserTweetsAsync(
                     ctx.Params["screen_name"],
                     ctx.Query.GetInt("count", 20),
-                    ctx.Query.GetString("cursor")).ConfigureAwait(false));
+                    ctx.Query.GetString("cursor"),
+                    ctx.Query.GetString("type"),
+                    ctx.Query.GetString("media")).ConfigureAwait(false));
             }
             catch (Exception ex)
             {

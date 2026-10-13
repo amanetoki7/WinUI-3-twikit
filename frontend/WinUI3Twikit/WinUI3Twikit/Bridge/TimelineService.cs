@@ -178,7 +178,12 @@ namespace WinUI3Twikit.Bridge
         }
 
         // --- 任意ユーザーのツイート ---
-        public static async Task<JsonObject> GetUserTweetsAsync(string screenName, int count, string? cursor)
+        /// <param name="tab">
+        /// ユーザーカラムのタブ。<c>tweets</c>（RT を除いたオリジナルのみ）/ <c>replies</c>（返信のみ）/
+        /// <c>retweets</c>（RT のみ）/ <c>media</c>（写真または動画）。省略時は従来どおり X の Tweets タブをそのまま返す。
+        /// </param>
+        /// <param name="mediaKind"><c>media</c> タブの種類。<c>photo</c>（既定）または <c>video</c>（GIF を含む）。</param>
+        public static async Task<JsonObject> GetUserTweetsAsync(string screenName, int count, string? cursor, string? tab = null, string? mediaKind = null)
         {
             var name = ProfileService.NormalizeScreenName(screenName);
             if (name.Length == 0)
@@ -190,16 +195,63 @@ namespace WinUI3Twikit.Bridge
             {
                 TwikitSession.Login();
                 var client = TwikitSession.Client;
-                Debug.WriteLine($"ユーザーツイート取得中... screen_name={name} count={count} cursor={Describe(cursor)}");
+                var feed = ResolveUserFeed(tab, mediaKind);
+                Debug.WriteLine($"ユーザーツイート取得中... screen_name={name} tab={tab ?? "(既定)"} type={feed.TweetType} count={count} cursor={Describe(cursor)}");
 
                 var userId = await ResolveUserIdAsync(client, name).ConfigureAwait(false);
-                return await UserTimelineAsync(client, userId, count, cursor, "ユーザーツイート").ConfigureAwait(false);
+                return await UserTimelineAsync(client, userId, count, cursor, "ユーザーツイート", feed).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"ユーザーツイート取得エラー: {ex.Message}");
                 return ErrorTweets(ex.Message);
             }
+        }
+
+        /// <summary>twikit に渡す tweetType と、取得後に適用する絞り込み（null なら絞り込まない）。</summary>
+        private sealed record UserFeed(string TweetType, Func<Tweet, bool>? Filter);
+
+        private static readonly UserFeed DefaultUserFeed = new("Tweets", null);
+
+        /// <summary>
+        /// 絞り込みで 1 ページが空になったとき、続きを読む最大ページ数。
+        /// RT をほとんどしないユーザーの「リポスト」タブなどで、空のページだけを返して終端扱いになるのを防ぐ。
+        /// </summary>
+        private const int MaxFilteredPages = 5;
+
+        private static UserFeed ResolveUserFeed(string? tab, string? mediaKind)
+        {
+            switch ((tab ?? string.Empty).Trim().ToLowerInvariant())
+            {
+                case "tweets":
+                    // X の Tweets タブは RT を含むので、オリジナル（引用を含む）だけに絞る。
+                    return new("Tweets", t => t.RetweetedTweet is null);
+                case "replies":
+                    // Replies タブ（TweetsAndReplies）には本人のオリジナルや RT も混ざるので、返信だけに絞る。
+                    return new("Replies", t => t.RetweetedTweet is null && t.InReplyTo is not null);
+                case "retweets":
+                    return new("Tweets", t => t.RetweetedTweet is not null);
+                case "media":
+                    var video = string.Equals(mediaKind, "video", StringComparison.OrdinalIgnoreCase);
+                    return new("Media", t => HasMediaOfKind(t.RetweetedTweet ?? t, video));
+                default:
+                    return DefaultUserFeed;
+            }
+        }
+
+        /// <summary>表示側と同じ判定（<see cref="TweetSerializer.ExtractMedia(Tweet)"/>）で、写真または動画（GIF 含む）を持つか。</summary>
+        private static bool HasMediaOfKind(Tweet tweet, bool video)
+        {
+            foreach (var item in TweetSerializer.ExtractMedia(tweet).Objects())
+            {
+                var isVideo = item.Str("type") is "video" or "animated_gif";
+                if (isVideo == video)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         // --- 自分のツイート（settings の screen_name → get_user_tweets） ---
@@ -212,7 +264,7 @@ namespace WinUI3Twikit.Bridge
                 Debug.WriteLine($"自分のツイート取得中... count={count} cursor={Describe(cursor)}");
 
                 var user = await TwikitSession.GetAuthenticatedUserAsync().ConfigureAwait(false);
-                return await UserTimelineAsync(client, user.Id, count, cursor, "自分のツイート").ConfigureAwait(false);
+                return await UserTimelineAsync(client, user.Id, count, cursor, "自分のツイート", DefaultUserFeed).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -221,23 +273,63 @@ namespace WinUI3Twikit.Bridge
             }
         }
 
-        private static async Task<JsonObject> UserTimelineAsync(Client client, string userId, int count, string? cursor, string label)
+        private static async Task<JsonObject> UserTimelineAsync(Client client, string userId, int count, string? cursor, string label, UserFeed feed)
         {
-            var (page, nextCursor) = await TweetPages.FetchAsync(
-                cursor,
-                count,
-                c => client.GetUserTweetsAsync(userId, "Tweets", count, c)).ConfigureAwait(false);
+            var results = new JsonArray();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            var currentCursor = cursor;
+            var pagesRead = 0;
 
-            if (page.Count == 0)
+            while (true)
             {
-                Debug.WriteLine($"{label}が空です");
-                return TweetsPayload([], null);
+                var (page, nextCursor) = await TweetPages.FetchAsync(
+                    currentCursor,
+                    count,
+                    c => client.GetUserTweetsAsync(userId, feed.TweetType, count, c)).ConfigureAwait(false);
+                pagesRead++;
+
+                if (page.Count == 0)
+                {
+                    // 空ページは終端として扱う（従来どおり next_cursor は null）。
+                    Debug.WriteLine($"{label}が空です");
+                    currentCursor = null;
+                    break;
+                }
+
+                foreach (var tweet in page)
+                {
+                    if (feed.Filter is not null && !feed.Filter(tweet))
+                    {
+                        continue;
+                    }
+
+                    if (!seen.Add(tweet.Id))
+                    {
+                        continue;
+                    }
+
+                    results.Add(TweetSerializer.TweetToDict(tweet));
+                }
+
+                currentCursor = nextCursor;
+                if (nextCursor is null)
+                {
+                    Debug.WriteLine("next_cursor がありません");
+                    break;
+                }
+
+                // 絞り込みで 1 件も残らなかったときだけ、上限まで続きを読む。
+                if (results.Count > 0 || feed.Filter is null || pagesRead >= MaxFilteredPages)
+                {
+                    Debug.WriteLine($"next_cursor 更新: {nextCursor}");
+                    break;
+                }
+
+                Debug.WriteLine($"{label}: 絞り込み後 0 件のため続きを取得 ({pagesRead}/{MaxFilteredPages})");
             }
 
-            var results = SerializeUnique(page);
-            Debug.WriteLine(nextCursor is null ? "next_cursor がありません" : $"next_cursor 更新: {nextCursor}");
             Debug.WriteLine($"{label} {results.Count} 件取得");
-            return TweetsPayload(results, nextCursor);
+            return TweetsPayload(results, currentCursor);
         }
 
         private static async Task<string> ResolveUserIdAsync(Client client, string screenName)

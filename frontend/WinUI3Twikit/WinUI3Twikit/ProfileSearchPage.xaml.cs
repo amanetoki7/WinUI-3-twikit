@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Navigation;
+using System;
 using System.ComponentModel;
 using System.Threading.Tasks;
 
@@ -16,6 +17,9 @@ namespace WinUI3Twikit
         private bool _loadingMoreFromScroll;
         private int _attachAttempts;
 
+        /// <summary>TabView の選択を ViewModel と同期している間は SelectionChanged を無視する。</summary>
+        private bool _tabReady;
+
         public ProfileSearchPage()
         {
             ViewModel = App.ViewModels.ProfileSearch;
@@ -26,6 +30,7 @@ namespace WinUI3Twikit
         private void ProfileSearchPage_Loaded(object sender, RoutedEventArgs e)
         {
             SyncSearchBoxFromViewModel();
+            SyncTabFromViewModel();
             SearchBox?.Focus(FocusState.Programmatic);
             SubscribeViewModel();
             SubscribeListViewLayout();
@@ -37,6 +42,7 @@ namespace WinUI3Twikit
             base.OnNavigatedTo(e);
             // 他ページからのプロフィール遷移直後に検索ボックスへ LastQuery を反映
             SyncSearchBoxFromViewModel();
+            SyncTabFromViewModel();
             SubscribeViewModel();
             SubscribeListViewLayout();
             AttachScrollHandler();
@@ -47,6 +53,112 @@ namespace WinUI3Twikit
             if (SearchBox != null && !string.IsNullOrEmpty(ViewModel.LastQuery))
             {
                 SearchBox.Text = ViewModel.LastQuery;
+            }
+        }
+
+        /// <summary>ViewModel が保持するタブ（ページ再訪問や新しいユーザーの検索でリセットされる）を TabView に反映する。</summary>
+        private void SyncTabFromViewModel()
+        {
+            if (TweetsTabView == null)
+            {
+                return;
+            }
+
+            _tabReady = false;
+            try
+            {
+                foreach (var item in TweetsTabView.TabItems)
+                {
+                    if (item is TabViewItem tab
+                        && tab.Tag is string tag
+                        && string.Equals(tag, ViewModel.CurrentTab, StringComparison.OrdinalIgnoreCase))
+                    {
+                        TweetsTabView.SelectedItem = tab;
+                        break;
+                    }
+                }
+            }
+            finally
+            {
+                _tabReady = true;
+            }
+        }
+
+        private async void TweetsTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!_tabReady)
+            {
+                return;
+            }
+
+            if (sender is not TabView tabView
+                || tabView.SelectedItem is not TabViewItem tabItem
+                || tabItem.Tag is not string tab
+                || string.Equals(tab, ViewModel.CurrentTab, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            await SwitchFeedAsync(() => ViewModel.SwitchTabAsync(tab));
+        }
+
+        private async void MediaKindMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not MenuFlyoutItem { Tag: string kind })
+            {
+                return;
+            }
+
+            await SwitchFeedAsync(() => ViewModel.SwitchMediaKindAsync(kind));
+        }
+
+        /// <summary>
+        /// タブ（またはメディアの写真 / 動画）を切り替える。
+        /// 切り替え前のスクロール位置を保存し、切り替え後はタブが見える位置（保存済みならその位置）に戻す。
+        /// </summary>
+        private async Task SwitchFeedAsync(Func<Task> switchAsync)
+        {
+            ScrollPositionHelper.SaveOffset(_scrollViewer, offset => ViewModel.ScrollVerticalOffset = offset);
+
+            App.MainWindow?.ShowLoading(true);
+            try
+            {
+                await switchAsync();
+            }
+            finally
+            {
+                if (!ViewModel.IsLoadingMore)
+                {
+                    App.MainWindow?.ShowLoading(false);
+                }
+            }
+
+            KeepTabStripVisible();
+            ScrollPositionHelper.RestoreOffset(_scrollViewer, ViewModel.ScrollVerticalOffset);
+            AttachScrollHandler();
+            DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => _ = LoadMoreIfNearBottomAsync());
+        }
+
+        /// <summary>プロフィールの下までスクロールした状態でタブを切り替えたとき、タブ列が画面外に残らないようにする。</summary>
+        private void KeepTabStripVisible()
+        {
+            if (_scrollViewer == null || TweetsTabView == null)
+            {
+                return;
+            }
+
+            try
+            {
+                var tabTop = TweetsTabView.TransformToVisual(_scrollViewer)
+                    .TransformPoint(new Windows.Foundation.Point(0, 0)).Y;
+                if (tabTop < 0)
+                {
+                    _scrollViewer.ChangeView(null, _scrollViewer.VerticalOffset + tabTop, null, true);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"ProfileSearch KeepTabStripVisible: {ex.Message}");
             }
         }
 
@@ -103,6 +215,13 @@ namespace WinUI3Twikit
 
         private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
+            if (e.PropertyName == nameof(ViewModel.CurrentTab))
+            {
+                // 新しいユーザーの検索でツイートタブへ戻ったときなど、ViewModel 側の変更を TabView に反映する
+                SyncTabFromViewModel();
+                return;
+            }
+
             if (e.PropertyName is nameof(ViewModel.IsContentVisible) or nameof(ViewModel.IsLoading))
             {
                 if (ViewModel.IsContentVisible)

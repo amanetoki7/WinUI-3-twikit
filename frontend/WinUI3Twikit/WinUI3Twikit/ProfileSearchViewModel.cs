@@ -10,23 +10,49 @@ using System.Threading.Tasks;
 
 namespace WinUI3Twikit
 {
+    /// <summary>
+    /// ユーザーカラム（プロフィール検索）の ViewModel。
+    /// プロフィールは GET /users/{screen_name}、ツイートは GET /users/{screen_name}/tweets?type=...。
+    /// 一覧はタブ（ツイート / 返信 / リポスト / メディア）ごとに別々に保持し、タブを切り替えても取得済みの内容は捨てない。
+    /// </summary>
     public partial class ProfileSearchViewModel : INotifyPropertyChanged, ITweetListActions
     {
         private const int DefaultTweetFetchCount = 20;
 
-        public ObservableCollection<TweetViewModel> Tweets { get; } = [];
+        /// <summary>タブ（API の <c>type</c> クエリと同じ値）。</summary>
+        public const string TabTweets = "tweets";
+        public const string TabReplies = "replies";
+        public const string TabRetweets = "retweets";
+        public const string TabMedia = "media";
+
+        /// <summary>メディアタブのプルダウン（API の <c>media</c> クエリと同じ値）。</summary>
+        public const string MediaPhoto = "photo";
+        public const string MediaVideo = "video";
+
+        /// <summary>タブ（メディアは写真・動画別）ごとの一覧とページ送り状態。</summary>
+        private sealed class Feed
+        {
+            public ObservableCollection<TweetViewModel> Tweets { get; } = [];
+            public HashSet<string> SeenIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+            public string? NextCursor { get; set; }
+            public bool CanLoadMore { get; set; } = true;
+
+            /// <summary>初回取得を試みたか（失敗も含む）。空メッセージの表示判定に使う。</summary>
+            public bool HasLoaded { get; set; }
+
+            public double ScrollOffset { get; set; }
+        }
 
         private readonly HttpClient _httpClient = new();
-        private readonly HashSet<string> _seenIds = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, Feed> _feeds = new(StringComparer.Ordinal);
 
         private bool _isLoading;
         private bool _isLoadingMore;
         private bool _hasProfile;
         private bool _hasError;
         private string? _currentScreenName;
-        private string? _nextCursor;
-        private bool _canLoadMore = true;
-        private double _scrollVerticalOffset;
+        private string _currentTab = TabTweets;
+        private string _mediaKind = MediaPhoto;
 
         private string _displayName = string.Empty;
         private string _screenNameDisplay = string.Empty;
@@ -47,6 +73,48 @@ namespace WinUI3Twikit
         private void OnPropertyChanged(string propertyName) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
+        /// <summary>表示中のタブの一覧。タブ切り替え時は <see cref="PropertyChanged"/> で差し替わる。</summary>
+        public ObservableCollection<TweetViewModel> Tweets => CurrentFeed.Tweets;
+
+        public string CurrentTab => _currentTab;
+
+        public string MediaKind => _mediaKind;
+
+        public bool IsMediaTabSelected => string.Equals(_currentTab, TabMedia, StringComparison.Ordinal);
+
+        /// <summary>メディアタブのプルダウンに表示する現在の種類。</summary>
+        public string MediaKindLabel => string.Equals(_mediaKind, MediaVideo, StringComparison.Ordinal) ? "動画" : "写真";
+
+        /// <summary>表示中のタブが取得済みで 0 件のときに出すメッセージ。</summary>
+        public string EmptyMessage => _currentTab switch
+        {
+            TabReplies => "返信がありません",
+            TabRetweets => "リポストがありません",
+            TabMedia => string.Equals(_mediaKind, MediaVideo, StringComparison.Ordinal) ? "動画がありません" : "写真がありません",
+            _ => "ポストがありません",
+        };
+
+        public bool ShowEmptyMessage =>
+            HasProfile && !IsLoading && !IsLoadingMore && CurrentFeed.HasLoaded && CurrentFeed.Tweets.Count == 0;
+
+        private string CurrentFeedKey => FeedKey(_currentTab, _mediaKind);
+
+        private Feed CurrentFeed => FeedFor(CurrentFeedKey);
+
+        private static string FeedKey(string tab, string mediaKind)
+            => string.Equals(tab, TabMedia, StringComparison.Ordinal) ? $"{tab}:{mediaKind}" : tab;
+
+        private Feed FeedFor(string key)
+        {
+            if (!_feeds.TryGetValue(key, out var feed))
+            {
+                feed = new Feed();
+                _feeds[key] = feed;
+            }
+
+            return feed;
+        }
+
         public bool IsLoading
         {
             get => _isLoading;
@@ -57,6 +125,7 @@ namespace WinUI3Twikit
                     _isLoading = value;
                     OnPropertyChanged(nameof(IsLoading));
                     OnPropertyChanged(nameof(IsContentVisible));
+                    OnPropertyChanged(nameof(ShowEmptyMessage));
                 }
             }
         }
@@ -70,6 +139,7 @@ namespace WinUI3Twikit
                 {
                     _isLoadingMore = value;
                     OnPropertyChanged(nameof(IsLoadingMore));
+                    OnPropertyChanged(nameof(ShowEmptyMessage));
                 }
             }
         }
@@ -84,6 +154,7 @@ namespace WinUI3Twikit
                     _hasProfile = value;
                     OnPropertyChanged(nameof(HasProfile));
                     OnPropertyChanged(nameof(IsContentVisible));
+                    OnPropertyChanged(nameof(ShowEmptyMessage));
                 }
             }
         }
@@ -103,16 +174,20 @@ namespace WinUI3Twikit
 
         public bool IsContentVisible => HasProfile && !IsLoading;
 
-        public bool CanLoadMore
+        /// <summary>表示中のタブに続きがあるか。</summary>
+        public bool CanLoadMore => CurrentFeed.CanLoadMore;
+
+        private void SetCanLoadMore(Feed feed, bool value)
         {
-            get => _canLoadMore;
-            private set
+            if (feed.CanLoadMore == value)
             {
-                if (_canLoadMore != value)
-                {
-                    _canLoadMore = value;
-                    OnPropertyChanged(nameof(CanLoadMore));
-                }
+                return;
+            }
+
+            feed.CanLoadMore = value;
+            if (ReferenceEquals(feed, CurrentFeed))
+            {
+                OnPropertyChanged(nameof(CanLoadMore));
             }
         }
 
@@ -285,10 +360,11 @@ namespace WinUI3Twikit
             }
         }
 
+        /// <summary>表示中のタブのスクロール位置（タブごとに保持）。</summary>
         public double ScrollVerticalOffset
         {
-            get => _scrollVerticalOffset;
-            set => _scrollVerticalOffset = value;
+            get => CurrentFeed.ScrollOffset;
+            set => CurrentFeed.ScrollOffset = value;
         }
 
         public static string NormalizeScreenName(string? query)
@@ -300,6 +376,15 @@ namespace WinUI3Twikit
             }
             return name.Trim();
         }
+
+        public static string NormalizeTab(string? tab)
+        {
+            var value = (tab ?? string.Empty).Trim().ToLowerInvariant();
+            return value is TabReplies or TabRetweets or TabMedia ? value : TabTweets;
+        }
+
+        public static string NormalizeMediaKind(string? kind)
+            => string.Equals((kind ?? string.Empty).Trim(), MediaVideo, StringComparison.OrdinalIgnoreCase) ? MediaVideo : MediaPhoto;
 
         public async Task SearchAsync(string query)
         {
@@ -314,12 +399,12 @@ namespace WinUI3Twikit
             HasError = false;
             ErrorMessage = string.Empty;
             HasProfile = false;
-            Tweets.Clear();
-            _seenIds.Clear();
-            _nextCursor = null;
-            CanLoadMore = true;
             _currentScreenName = screenName;
-            ScrollVerticalOffset = 0;
+
+            // 別のユーザーを開くときは、全タブの一覧を捨ててツイートタブから表示する。
+            _feeds.Clear();
+            _currentTab = TabTweets;
+            NotifyFeedChanged();
 
             try
             {
@@ -335,6 +420,9 @@ namespace WinUI3Twikit
             {
                 IsLoading = false;
             }
+
+            // 読み込み中に別のタブへ切り替えられていた場合、そのタブの初回分を取得する。
+            await EnsureCurrentFeedLoadedAsync();
         }
 
         private async Task<bool> LoadProfileAsync(string screenName)
@@ -409,23 +497,93 @@ namespace WinUI3Twikit
             IsVerified = false;
         }
 
+        /// <summary>
+        /// 表示するタブを切り替える。未取得のタブなら初回分を取得する。
+        /// 取得中なら、その取得の終了後に切り替え先を取得する。
+        /// </summary>
+        public async Task SwitchTabAsync(string? tab)
+        {
+            var normalized = NormalizeTab(tab);
+            if (string.Equals(normalized, _currentTab, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _currentTab = normalized;
+            NotifyFeedChanged();
+            await EnsureCurrentFeedLoadedAsync();
+        }
+
+        /// <summary>メディアタブの写真 / 動画を切り替える。</summary>
+        public async Task SwitchMediaKindAsync(string? kind)
+        {
+            var normalized = NormalizeMediaKind(kind);
+            if (string.Equals(normalized, _mediaKind, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _mediaKind = normalized;
+            NotifyFeedChanged();
+            if (IsMediaTabSelected)
+            {
+                await EnsureCurrentFeedLoadedAsync();
+            }
+        }
+
+        private void NotifyFeedChanged()
+        {
+            OnPropertyChanged(nameof(CurrentTab));
+            OnPropertyChanged(nameof(MediaKind));
+            OnPropertyChanged(nameof(IsMediaTabSelected));
+            OnPropertyChanged(nameof(MediaKindLabel));
+            OnPropertyChanged(nameof(Tweets));
+            OnPropertyChanged(nameof(CanLoadMore));
+            OnPropertyChanged(nameof(EmptyMessage));
+            OnPropertyChanged(nameof(ShowEmptyMessage));
+        }
+
+        private async Task EnsureCurrentFeedLoadedAsync()
+        {
+            if (!HasProfile || IsLoading || IsLoadingMore || CurrentFeed.HasLoaded)
+            {
+                return;
+            }
+
+            await LoadMoreTweetsAsync();
+        }
+
         public async Task LoadMoreTweetsAsync()
         {
-            if (IsLoadingMore || string.IsNullOrEmpty(_currentScreenName) || !CanLoadMore)
+            if (IsLoadingMore || string.IsNullOrEmpty(_currentScreenName))
+            {
+                return;
+            }
+
+            // 取得中にタブが切り替わっても、結果は要求したタブへ入れる。
+            var feed = CurrentFeed;
+            var feedKey = CurrentFeedKey;
+            var tab = _currentTab;
+            var mediaKind = _mediaKind;
+            if (!feed.CanLoadMore)
             {
                 return;
             }
 
             IsLoadingMore = true;
-            var requestedCursor = _nextCursor;
+            var requestedCursor = feed.NextCursor;
 
             try
             {
                 var url =
-                    $"http://localhost:8000/users/{Uri.EscapeDataString(_currentScreenName)}/tweets?count={DefaultTweetFetchCount}";
-                if (!string.IsNullOrWhiteSpace(_nextCursor))
+                    $"http://localhost:8000/users/{Uri.EscapeDataString(_currentScreenName)}/tweets?count={DefaultTweetFetchCount}&type={tab}";
+                if (string.Equals(tab, TabMedia, StringComparison.Ordinal))
                 {
-                    url += $"&cursor={Uri.EscapeDataString(_nextCursor)}";
+                    url += $"&media={mediaKind}";
+                }
+                if (!string.IsNullOrWhiteSpace(requestedCursor))
+                {
+                    url += $"&cursor={Uri.EscapeDataString(requestedCursor)}";
                 }
 
                 var response = await _httpClient.GetAsync(url);
@@ -437,9 +595,9 @@ namespace WinUI3Twikit
                 if (!string.IsNullOrEmpty(payload?.error) && (payload.tweets == null || payload.tweets.Count == 0))
                 {
                     // プロフィールは表示したまま、ツイート取得失敗はログのみ（UI を壊さない）
-                    System.Diagnostics.Debug.WriteLine($"ProfileSearch tweets error: {payload.error}");
-                    _nextCursor = null;
-                    CanLoadMore = false;
+                    System.Diagnostics.Debug.WriteLine($"ProfileSearch tweets error ({feedKey}): {payload.error}");
+                    feed.NextCursor = null;
+                    SetCanLoadMore(feed, false);
                     return;
                 }
 
@@ -448,42 +606,49 @@ namespace WinUI3Twikit
                 {
                     foreach (var dto in payload.tweets)
                     {
-                        if (string.IsNullOrEmpty(dto.id) || _seenIds.Contains(dto.id))
+                        if (string.IsNullOrEmpty(dto.id) || !feed.SeenIds.Add(dto.id))
                         {
                             continue;
                         }
 
-                        _seenIds.Add(dto.id);
-                        Tweets.Add(TweetViewModel.FromDto(dto));
+                        feed.Tweets.Add(TweetViewModel.FromDto(dto));
                         added++;
                     }
                 }
 
                 var nextCursor = payload?.next_cursor;
-                _nextCursor = nextCursor;
+                feed.NextCursor = nextCursor;
 
                 // 新規0件、またはカーソルが進まない場合は打ち切り（同一ページの再取得ループ防止）
-                CanLoadMore = added > 0
+                var canLoadMore = added > 0
                     && !string.IsNullOrEmpty(nextCursor)
                     && !string.Equals(nextCursor, requestedCursor, StringComparison.Ordinal);
-                if (!CanLoadMore)
+                SetCanLoadMore(feed, canLoadMore);
+                if (!canLoadMore)
                 {
                     System.Diagnostics.Debug.WriteLine(
-                        $"ProfileSearch LoadMore stop: added={added}, nextCursor={(string.IsNullOrEmpty(nextCursor) ? "なし" : "あり")}");
+                        $"ProfileSearch LoadMore stop ({feedKey}): added={added}, nextCursor={(string.IsNullOrEmpty(nextCursor) ? "なし" : "あり")}");
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"ProfileSearch LoadMore Error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"ProfileSearch LoadMore Error ({feedKey}): {ex.Message}");
             }
             finally
             {
+                feed.HasLoaded = true;
                 IsLoadingMore = false;
             }
+
+            // 取得中に別のタブへ切り替えられていたら、そのタブの初回分を続けて取得する。
+            await EnsureCurrentFeedLoadedAsync();
         }
 
         public TweetViewModel? FindTweetById(string tweetId)
-            => Tweets.FirstOrDefault(t => string.Equals(t.Id, tweetId, StringComparison.Ordinal));
+            => Tweets.FirstOrDefault(t => string.Equals(t.Id, tweetId, StringComparison.Ordinal))
+               ?? _feeds.Values
+                   .SelectMany(feed => feed.Tweets)
+                   .FirstOrDefault(t => string.Equals(t.Id, tweetId, StringComparison.Ordinal));
 
         public Task<bool> LikeTweetAsync(string tweetId, bool currentlyLiked)
             => TweetActionClient.LikeAsync(_httpClient, tweetId, currentlyLiked);
@@ -525,14 +690,15 @@ namespace WinUI3Twikit
             };
             SessionAccount.CopyAuthorTo(replyVm);
 
-            var index = Tweets.IndexOf(originalVm);
+            var tweets = Tweets;
+            var index = tweets.IndexOf(originalVm);
             if (index >= 0)
             {
-                Tweets.Insert(index + 1, replyVm);
+                tweets.Insert(index + 1, replyVm);
             }
             else
             {
-                Tweets.Add(replyVm);
+                tweets.Add(replyVm);
             }
         }
 
@@ -555,14 +721,15 @@ namespace WinUI3Twikit
             SessionAccount.CopyAuthorTo(quoteVm);
             TweetViewModel.FinalizeQuotedCardMedia(quoteVm);
 
-            var index = Tweets.IndexOf(originalVm);
+            var tweets = Tweets;
+            var index = tweets.IndexOf(originalVm);
             if (index >= 0)
             {
-                Tweets.Insert(index + 1, quoteVm);
+                tweets.Insert(index + 1, quoteVm);
             }
             else
             {
-                Tweets.Add(quoteVm);
+                tweets.Add(quoteVm);
             }
         }
 
