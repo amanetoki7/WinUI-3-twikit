@@ -64,7 +64,7 @@
                 Click="LikeButton_Click"
                 Padding="8,4">
             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                <FontIcon Glyph="&#xEB51;" FontSize="18" Width="18" Foreground="{x:Bind Tweet.IsLiked, Converter={StaticResource LikeColorConverter}}"/>
+                <FontIcon Glyph="{x:Bind LikeGlyph(Tweet.IsLiked)}" FontSize="18" Width="18" Foreground="{x:Bind Tweet.IsLiked, Converter={StaticResource LikeColorConverter}}"/>
                 <TextBlock Text="{x:Bind Tweet.FavoriteCountDisplay}"
                            Width="48"
                            TextTrimming="CharacterEllipsis"

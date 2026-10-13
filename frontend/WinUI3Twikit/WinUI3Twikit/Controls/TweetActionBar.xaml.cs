@@ -18,6 +18,9 @@ namespace WinUI3Twikit.Controls
             set => SetValue(TweetProperty, value);
         }
 
+        /// <summary>いいね済みは塗りつぶしのハート。</summary>
+        public string LikeGlyph(bool liked) => liked ? "\uEB52" : "\uEB51";
+
         private ITweetListActions? _hostActions;
 
         public TweetActionBar()
