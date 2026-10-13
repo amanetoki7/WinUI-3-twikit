@@ -1,5 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using System;
+using Windows.System;
 
 namespace WinUI3Twikit.Controls
 {
@@ -90,6 +92,15 @@ namespace WinUI3Twikit.Controls
                     vm.ReplyText = string.Empty;
                     vm.CancelQuoting();
                 }
+            }
+        }
+
+        private async void OpenInBrowser_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button { DataContext: TweetViewModel { TweetUrl.Length: > 0 } vm }
+                && Uri.TryCreate(vm.TweetUrl, UriKind.Absolute, out var uri))
+            {
+                await Launcher.LaunchUriAsync(uri);
             }
         }
     }

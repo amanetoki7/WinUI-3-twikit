@@ -58,6 +58,7 @@ namespace WinUI3Twikit.Bridge
             new("POST", ["like", "{tweet_id}"], ctx => EnqueueAction("like", ctx)),
             new("DELETE", ["like", "{tweet_id}"], ctx => EnqueueAction("unlike", ctx)),
             new("POST", ["retweet", "{tweet_id}"], ctx => EnqueueAction("retweet", ctx)),
+            new("DELETE", ["retweet", "{tweet_id}"], ctx => EnqueueAction("unretweet", ctx)),
             new("POST", ["reply", "{tweet_id}"], Reply),
             new("POST", ["quote", "{tweet_id}"], Quote),
             new("GET", ["profile"], Profile),
@@ -201,11 +202,18 @@ namespace WinUI3Twikit.Bridge
             return JsonResponses.Ok(result);
         }
 
-        // --- いいね / いいね解除 / リツイート（キュー処理） ---
+        // --- いいね / いいね解除 / リツイート / リツイート取り消し（キュー処理） ---
+        // 送信完了まで待ち、失敗なら success=false と理由を返す（UI 側で楽観的更新を戻す）。
         private static async Task<HttpResponseMessage> EnqueueAction(string action, RouteContext ctx)
         {
-            await ActionQueue.Instance.EnqueueAsync(new ActionJob(action, ctx.Params["tweet_id"])).ConfigureAwait(false);
-            return JsonResponses.Ok(new JsonObject { ["success"] = true, ["action"] = action, ["queued"] = true });
+            var result = await ActionQueue.Instance.EnqueueAsync(new ActionJob(action, ctx.Params["tweet_id"])).ConfigureAwait(false);
+            return JsonResponses.Ok(new JsonObject
+            {
+                ["success"] = result.Ok,
+                ["action"] = action,
+                ["queued"] = true,
+                ["error"] = result.Ok ? null : result.Error,
+            });
         }
 
         // --- リプライ ---

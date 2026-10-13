@@ -81,6 +81,17 @@
             <muxc:Frame x:Name="ContentFrame" />
         </muxc:NavigationView>
 
+        <!-- 操作失敗などの通知（AppNotifications）。数秒で自動的に閉じる -->
+        <muxc:InfoBar x:Name="AppInfoBar"
+                      IsOpen="False"
+                      IsClosable="True"
+                      VerticalAlignment="Top"
+                      HorizontalAlignment="Center"
+                      MinWidth="320"
+                      MaxWidth="720"
+                      Margin="0,48,0,0"
+                      Canvas.ZIndex="10" />
+
         <tb:TaskbarIcon
             x:Name="TrayIcon"
             IconSource="ms-appx:///TwitterIcon48.ico"

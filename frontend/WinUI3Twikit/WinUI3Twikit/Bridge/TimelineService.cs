@@ -15,7 +15,12 @@ namespace WinUI3Twikit.Bridge
     {
         private static readonly PageCursorStore<Tweet> TweetPages = new(capacity: 512);
         private static readonly PageCursorStore<TwitterList> ListPages = new();
-        private static readonly Dictionary<string, string> UserIdsByScreenName = new(StringComparer.OrdinalIgnoreCase);
+        /// <summary>スクリーンネーム → ユーザー ID と固定ツイート ID。固定は変わるので一定時間で取り直す。</summary>
+        private sealed record ResolvedUser(string Id, HashSet<string> PinnedTweetIds, DateTime ResolvedAtUtc);
+
+        private static readonly TimeSpan ResolvedUserTtl = TimeSpan.FromMinutes(10);
+
+        private static readonly Dictionary<string, ResolvedUser> UsersByScreenName = new(StringComparer.OrdinalIgnoreCase);
 
         private static string Describe(string? cursor) => string.IsNullOrEmpty(cursor) ? "なし" : "あり";
 
@@ -198,8 +203,9 @@ namespace WinUI3Twikit.Bridge
                 var feed = ResolveUserFeed(tab, mediaKind);
                 Debug.WriteLine($"ユーザーツイート取得中... screen_name={name} tab={tab ?? "(既定)"} type={feed.TweetType} count={count} cursor={Describe(cursor)}");
 
-                var userId = await ResolveUserIdAsync(client, name).ConfigureAwait(false);
-                return await UserTimelineAsync(client, userId, count, cursor, "ユーザーツイート", feed).ConfigureAwait(false);
+                // 1 ページ目（最新取得）のときは固定ツイートの変更を拾えるよう、期限切れなら取り直す
+                var user = await ResolveUserAsync(client, name, allowRefresh: string.IsNullOrEmpty(cursor)).ConfigureAwait(false);
+                return await UserTimelineAsync(client, user.Id, user.PinnedTweetIds, count, cursor, "ユーザーツイート", feed).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -264,7 +270,8 @@ namespace WinUI3Twikit.Bridge
                 Debug.WriteLine($"自分のツイート取得中... count={count} cursor={Describe(cursor)}");
 
                 var user = await TwikitSession.GetAuthenticatedUserAsync().ConfigureAwait(false);
-                return await UserTimelineAsync(client, user.Id, count, cursor, "自分のツイート", DefaultUserFeed).ConfigureAwait(false);
+                var pinned = new HashSet<string>(user.PinnedTweetIds, StringComparer.Ordinal);
+                return await UserTimelineAsync(client, user.Id, pinned, count, cursor, "自分のツイート", DefaultUserFeed).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -273,7 +280,7 @@ namespace WinUI3Twikit.Bridge
             }
         }
 
-        private static async Task<JsonObject> UserTimelineAsync(Client client, string userId, int count, string? cursor, string label, UserFeed feed)
+        private static async Task<JsonObject> UserTimelineAsync(Client client, string userId, HashSet<string> pinnedTweetIds, int count, string? cursor, string label, UserFeed feed)
         {
             var results = new JsonArray();
             var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -308,7 +315,16 @@ namespace WinUI3Twikit.Bridge
                         continue;
                     }
 
-                    results.Add(TweetSerializer.TweetToDict(tweet));
+                    var dict = TweetSerializer.TweetToDict(tweet);
+
+                    // twikit は Tweets の 1 ページ目の先頭に固定ツイートを入れるが、固定であることは Tweet に残らない。
+                    // プロフィールの pinned_tweet_ids と突き合わせて印を付ける。
+                    if (feed.TweetType == "Tweets" && tweet.RetweetedTweet is null && pinnedTweetIds.Contains(tweet.Id))
+                    {
+                        dict["is_pinned"] = true;
+                    }
+
+                    results.Add(dict);
                 }
 
                 currentCursor = nextCursor;
@@ -332,23 +348,32 @@ namespace WinUI3Twikit.Bridge
             return TweetsPayload(results, currentCursor);
         }
 
-        private static async Task<string> ResolveUserIdAsync(Client client, string screenName)
+        /// <summary>
+        /// スクリーンネームからユーザー ID と固定ツイート ID を引く。
+        /// <paramref name="allowRefresh"/> が true で期限切れなら取り直す（固定ツイートの変更を反映する）。
+        /// </summary>
+        private static async Task<ResolvedUser> ResolveUserAsync(Client client, string screenName, bool allowRefresh)
         {
-            lock (UserIdsByScreenName)
+            lock (UsersByScreenName)
             {
-                if (UserIdsByScreenName.TryGetValue(screenName, out var cached))
+                if (UsersByScreenName.TryGetValue(screenName, out var cached)
+                    && (!allowRefresh || DateTime.UtcNow - cached.ResolvedAtUtc < ResolvedUserTtl))
                 {
                     return cached;
                 }
             }
 
             var user = await client.GetUserByScreenNameAsync(screenName).ConfigureAwait(false);
-            lock (UserIdsByScreenName)
+            var resolved = new ResolvedUser(
+                user.Id,
+                new HashSet<string>(user.PinnedTweetIds, StringComparer.Ordinal),
+                DateTime.UtcNow);
+            lock (UsersByScreenName)
             {
-                UserIdsByScreenName[screenName] = user.Id;
+                UsersByScreenName[screenName] = resolved;
             }
 
-            return user.Id;
+            return resolved;
         }
     }
 }

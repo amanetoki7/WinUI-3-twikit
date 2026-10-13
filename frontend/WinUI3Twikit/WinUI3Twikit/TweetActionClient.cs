@@ -12,14 +12,16 @@ namespace WinUI3Twikit
     {
         private sealed class ActionResponse
         {
-            public bool success { get; set; }
+            public bool success { get; set; } = true;
+            public string? error { get; set; }
+            public string? detail { get; set; }
         }
 
-        public static async Task<bool> LikeAsync(HttpClient client, string tweetId, bool currentlyLiked)
+        public static async Task<ActionOutcome> LikeAsync(HttpClient client, string tweetId, bool currentlyLiked)
         {
             if (string.IsNullOrEmpty(tweetId))
             {
-                return false;
+                return ActionOutcome.Failed("ツイート ID がありません");
             }
 
             try
@@ -27,31 +29,34 @@ namespace WinUI3Twikit
                 var response = currentlyLiked
                     ? await client.DeleteAsync($"http://localhost:8000/like/{tweetId}")
                     : await client.PostAsync($"http://localhost:8000/like/{tweetId}", null);
-                return await IsActionSuccessfulAsync(response);
+                return await ReadOutcomeAsync(response);
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Like API Error: {ex.Message}");
-                return false;
+                return ActionOutcome.Failed(ex.Message);
             }
         }
 
-        public static async Task<bool> RetweetAsync(HttpClient client, string tweetId)
+        /// <summary>RT 済みなら取り消し（DELETE）、未 RT なら RT（POST）。</summary>
+        public static async Task<ActionOutcome> RetweetAsync(HttpClient client, string tweetId, bool currentlyRetweeted)
         {
             if (string.IsNullOrEmpty(tweetId))
             {
-                return false;
+                return ActionOutcome.Failed("ツイート ID がありません");
             }
 
             try
             {
-                var response = await client.PostAsync($"http://localhost:8000/retweet/{tweetId}", null);
-                return await IsActionSuccessfulAsync(response);
+                var response = currentlyRetweeted
+                    ? await client.DeleteAsync($"http://localhost:8000/retweet/{tweetId}")
+                    : await client.PostAsync($"http://localhost:8000/retweet/{tweetId}", null);
+                return await ReadOutcomeAsync(response);
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Retweet API Error: {ex.Message}");
-                return false;
+                return ActionOutcome.Failed(ex.Message);
             }
         }
 
@@ -93,28 +98,36 @@ namespace WinUI3Twikit
             }
         }
 
-        private static async Task<bool> IsActionSuccessfulAsync(HttpResponseMessage response)
+        private static async Task<ActionOutcome> ReadOutcomeAsync(HttpResponseMessage response)
         {
+            var json = await response.Content.ReadAsStringAsync();
+            ActionResponse? result = null;
+            if (!string.IsNullOrWhiteSpace(json))
+            {
+                try
+                {
+                    result = JsonSerializer.Deserialize<ActionResponse>(json);
+                }
+                catch (JsonException)
+                {
+                    // JSON でなければ HTTP ステータスだけで判断する
+                }
+            }
+
             if (!response.IsSuccessStatusCode)
             {
-                return false;
+                var detail = result?.detail ?? result?.error;
+                return ActionOutcome.Failed(string.IsNullOrEmpty(detail)
+                    ? $"HTTP {(int)response.StatusCode}"
+                    : detail);
             }
 
-            var json = await response.Content.ReadAsStringAsync();
-            if (string.IsNullOrWhiteSpace(json))
+            if (result is null || result.success)
             {
-                return true;
+                return ActionOutcome.Succeeded;
             }
 
-            try
-            {
-                var result = JsonSerializer.Deserialize<ActionResponse>(json);
-                return result?.success ?? true;
-            }
-            catch (JsonException)
-            {
-                return true;
-            }
+            return ActionOutcome.Failed(result.error ?? "送信に失敗しました");
         }
     }
 }

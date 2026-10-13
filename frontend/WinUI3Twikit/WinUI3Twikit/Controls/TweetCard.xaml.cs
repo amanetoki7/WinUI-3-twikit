@@ -1,6 +1,5 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 
 namespace WinUI3Twikit.Controls
@@ -62,15 +61,6 @@ namespace WinUI3Twikit.Controls
             }
 
             return null;
-        }
-
-        private async void MediaThumbnail_Tapped(object sender, TappedRoutedEventArgs e)
-        {
-            e.Handled = true;
-            if (sender is Image image)
-            {
-                await MediaPreviewHelper.ShowFromThumbnailAsync(this, image);
-            }
         }
     }
 }

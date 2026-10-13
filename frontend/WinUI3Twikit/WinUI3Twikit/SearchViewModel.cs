@@ -21,11 +21,26 @@ namespace WinUI3Twikit
         private string? _lastCursor = null;
         private string? _currentQuery = null;
         private double _scrollVerticalOffset;
+        private string _lastQuery = string.Empty;
 
         public double ScrollVerticalOffset
         {
             get => _scrollVerticalOffset;
             set => _scrollVerticalOffset = value;
+        }
+
+        /// <summary>最後に検索したクエリ。他ページからの遷移時に検索ボックスへ反映する。</summary>
+        public string LastQuery
+        {
+            get => _lastQuery;
+            private set
+            {
+                if (_lastQuery != value)
+                {
+                    _lastQuery = value;
+                    OnPropertyChanged(nameof(LastQuery));
+                }
+            }
         }
 
         public bool IsLoading
@@ -48,6 +63,7 @@ namespace WinUI3Twikit
         {
             if (string.IsNullOrWhiteSpace(query)) return;
 
+            LastQuery = query.Trim();
             IsLoading = true;
             SearchResults.Clear();
             _seenIds.Clear();                    // ← 追加
@@ -114,11 +130,11 @@ namespace WinUI3Twikit
         public TweetViewModel? FindTweetById(string tweetId)
             => SearchResults.FirstOrDefault(t => string.Equals(t.Id, tweetId, StringComparison.Ordinal));
 
-        public Task<bool> LikeTweetAsync(string tweetId, bool currentlyLiked)
+        public Task<ActionOutcome> LikeTweetAsync(string tweetId, bool currentlyLiked)
             => TweetActionClient.LikeAsync(_httpClient, tweetId, currentlyLiked);
 
-        public Task<bool> RetweetTweetAsync(string tweetId)
-            => TweetActionClient.RetweetAsync(_httpClient, tweetId);
+        public Task<ActionOutcome> RetweetTweetAsync(string tweetId, bool currentlyRetweeted)
+            => TweetActionClient.RetweetAsync(_httpClient, tweetId, currentlyRetweeted);
 
         public async Task<HttpResponseMessage> ReplyTweetAsync(string tweetId, string replyText)
         {

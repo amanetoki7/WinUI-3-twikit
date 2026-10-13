@@ -19,8 +19,24 @@ namespace WinUI3Twikit
 
         private void SearchPage_Loaded(object sender, RoutedEventArgs e)
         {
+            SyncSearchBoxFromViewModel();
             SearchBox.Focus(FocusState.Programmatic);
             AttachScrollHandler();
+        }
+
+        protected override void OnNavigatedTo(NavigationEventArgs e)
+        {
+            base.OnNavigatedTo(e);
+            // 本文のハッシュタグなどからの遷移直後に、検索中のクエリを検索ボックスへ反映する
+            SyncSearchBoxFromViewModel();
+        }
+
+        private void SyncSearchBoxFromViewModel()
+        {
+            if (SearchBox != null && !string.IsNullOrEmpty(ViewModel.LastQuery))
+            {
+                SearchBox.Text = ViewModel.LastQuery;
+            }
         }
 
         private async void SearchButton_Click(object sender, RoutedEventArgs e)

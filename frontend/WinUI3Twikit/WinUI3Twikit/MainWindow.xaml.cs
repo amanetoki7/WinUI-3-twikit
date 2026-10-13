@@ -132,6 +132,10 @@ namespace WinUI3Twikit
 
             this.Closed += MainWindow_Closed;
 
+            _infoBarTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
+            _infoBarTimer.Tick += InfoBarTimer_Tick;
+            AppNotifications.Posted += OnAppNotificationPosted;
+
             App.ViewModels.Timeline.PropertyChanged += Timeline_PropertyChanged;
             UpdateTweetCountDisplay();
 
@@ -282,6 +286,69 @@ namespace WinUI3Twikit
             NavigateToPage(typeof(ProfileSearchPage));
 
             _ = FinishProfileSearchLoadingAsync(searchTask);
+        }
+
+        /// <summary>
+        /// 本文のハッシュタグなどから検索ページへ遷移し、指定クエリで検索する。
+        /// </summary>
+        public void NavigateToSearch(string? query)
+        {
+            var text = (query ?? string.Empty).Trim();
+            if (text.Length == 0)
+            {
+                return;
+            }
+
+            // SearchAsync は最初の await 前に LastQuery をセットするので、ページ側の Loaded で検索ボックスに反映できる。
+            var searchTask = App.ViewModels.Search.SearchAsync(text);
+
+            NavigateToPage(typeof(SearchPage));
+
+            _ = FinishProfileSearchLoadingAsync(searchTask);
+        }
+
+        // --- 画面上部の通知（AppNotifications → InfoBar） ---
+        private readonly DispatcherTimer _infoBarTimer;
+
+        private void OnAppNotificationPosted(AppNotification notification)
+        {
+            if (App.IsShuttingDown)
+            {
+                return;
+            }
+
+            if (!DispatcherQueue.HasThreadAccess)
+            {
+                DispatcherQueue.TryEnqueue(() => OnAppNotificationPosted(notification));
+                return;
+            }
+
+            if (AppInfoBar == null)
+            {
+                return;
+            }
+
+            AppInfoBar.Severity = notification.Severity switch
+            {
+                AppNotificationSeverity.Success => InfoBarSeverity.Success,
+                AppNotificationSeverity.Warning => InfoBarSeverity.Warning,
+                AppNotificationSeverity.Error => InfoBarSeverity.Error,
+                _ => InfoBarSeverity.Informational,
+            };
+            AppInfoBar.Message = notification.Message;
+            AppInfoBar.IsOpen = true;
+
+            _infoBarTimer.Stop();
+            _infoBarTimer.Start();
+        }
+
+        private void InfoBarTimer_Tick(object? sender, object e)
+        {
+            _infoBarTimer.Stop();
+            if (!App.IsShuttingDown && AppInfoBar != null)
+            {
+                AppInfoBar.IsOpen = false;
+            }
         }
 
         private async System.Threading.Tasks.Task FinishProfileSearchLoadingAsync(

@@ -544,11 +544,11 @@ namespace WinUI3Twikit
         public TweetViewModel? FindTweetById(string tweetId)
             => Tweets.FirstOrDefault(t => string.Equals(t.Id, tweetId, StringComparison.Ordinal));
 
-        public Task<bool> LikeTweetAsync(string tweetId, bool currentlyLiked)
+        public Task<ActionOutcome> LikeTweetAsync(string tweetId, bool currentlyLiked)
             => TweetActionClient.LikeAsync(_httpClient, tweetId, currentlyLiked);
 
-        public Task<bool> RetweetTweetAsync(string tweetId)
-            => TweetActionClient.RetweetAsync(_httpClient, tweetId);
+        public Task<ActionOutcome> RetweetTweetAsync(string tweetId, bool currentlyRetweeted)
+            => TweetActionClient.RetweetAsync(_httpClient, tweetId, currentlyRetweeted);
 
         public async Task<HttpResponseMessage> ReplyTweetAsync(string tweetId, string replyText)
         {

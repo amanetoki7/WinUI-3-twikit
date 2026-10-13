@@ -14,7 +14,7 @@
         <local:RetweetColorConverter x:Key="RetweetColorConverter" />
     </UserControl.Resources>
 
-    <Grid ColumnDefinitions="90,90,90,90"
+    <Grid ColumnDefinitions="90,90,90,90,Auto"
           ColumnSpacing="12"
           HorizontalAlignment="Left"
           Margin="0,8,0,0">
@@ -51,7 +51,7 @@
             </StackPanel>
             <DropDownButton.Flyout>
                 <MenuFlyout Placement="Bottom">
-                    <MenuFlyoutItem Text="リツイート" Click="RetweetMenuItem_Click" Tag="{x:Bind Tweet}"/>
+                    <MenuFlyoutItem Text="{x:Bind Tweet.RetweetMenuText}" Click="RetweetMenuItem_Click" Tag="{x:Bind Tweet}"/>
                     <MenuFlyoutItem Text="引用ツイート" Click="QuoteMenuItem_Click" Tag="{x:Bind Tweet}"/>
                 </MenuFlyout>
             </DropDownButton.Flyout>
@@ -86,5 +86,14 @@
                        Style="{StaticResource CaptionTextBlockStyle}"
                        VerticalAlignment="Center"/>
         </StackPanel>
+        <Button Grid.Column="4"
+                MinWidth="0"
+                Style="{StaticResource SubtleButtonStyle}"
+                Click="OpenInBrowser_Click"
+                Padding="8,4"
+                VerticalAlignment="Center"
+                ToolTipService.ToolTip="ブラウザで開く">
+            <FontIcon Glyph="&#xE8A7;" FontSize="18" Width="18" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+        </Button>
     </Grid>
 </UserControl>

@@ -1,7 +1,8 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
-using System.Linq;
+using System;
+using Windows.System;
 
 namespace WinUI3Twikit.Controls
 {
@@ -53,20 +54,23 @@ namespace WinUI3Twikit.Controls
             VisualStateManager.GoToState(this, "Normal", true);
         }
 
-        private void QuoteBorder_Tapped(object sender, TappedRoutedEventArgs e)
+        /// <summary>引用元を既定のブラウザで開く。</summary>
+        private async void QuoteBorder_Tapped(object sender, TappedRoutedEventArgs e)
         {
-            // 将来: 引用元ツイート詳細へ遷移
-        }
-
-        private async void MediaThumbnail_Tapped(object sender, TappedRoutedEventArgs e)
-        {
-            e.Handled = true;
-            if (sender is Image image)
+            var quoted = Tweet?.QuotedTweet;
+            if (quoted is null || quoted.IsUnavailable || string.IsNullOrEmpty(quoted.Id))
             {
-                await MediaPreviewHelper.ShowFromThumbnailAsync(
-                    this,
-                    image,
-                    Tweet?.QuotedCardMediaItems.FirstOrDefault());
+                return;
+            }
+
+            e.Handled = true;
+            try
+            {
+                await Launcher.LaunchUriAsync(new Uri($"https://x.com/i/status/{quoted.Id}"));
+            }
+            catch (Exception ex)
+            {
+                AppNotifications.Error($"ブラウザで開けませんでした: {ex.Message}");
             }
         }
     }

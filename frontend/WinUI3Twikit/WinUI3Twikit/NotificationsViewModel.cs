@@ -217,6 +217,8 @@ namespace WinUI3Twikit
                                 user_verified = dto.user_verified,
                                 media_items = dto.media_items,
                                 quoted_tweet = dto.quoted_tweet,
+                                urls = dto.urls,
+                                reply_to_screen_name = dto.reply_to_screen_name,
                             });
                         }
 
@@ -326,11 +328,11 @@ namespace WinUI3Twikit
             return null;
         }
 
-        public Task<bool> LikeTweetAsync(string tweetId, bool currentlyLiked)
+        public Task<ActionOutcome> LikeTweetAsync(string tweetId, bool currentlyLiked)
             => TweetActionClient.LikeAsync(_httpClient, tweetId, currentlyLiked);
 
-        public Task<bool> RetweetTweetAsync(string tweetId)
-            => TweetActionClient.RetweetAsync(_httpClient, tweetId);
+        public Task<ActionOutcome> RetweetTweetAsync(string tweetId, bool currentlyRetweeted)
+            => TweetActionClient.RetweetAsync(_httpClient, tweetId, currentlyRetweeted);
 
         public async Task<HttpResponseMessage> ReplyTweetAsync(string tweetId, string replyText)
         {
@@ -391,6 +393,7 @@ namespace WinUI3Twikit
         public string? reply_to_screen_name { get; set; }
         public List<MediaItemDto>? media_items { get; set; }
         public QuotedTweetDto? quoted_tweet { get; set; }
+        public List<UrlEntityDto>? urls { get; set; }
     }
 
     public partial class NotificationViewModel : INotifyPropertyChanged

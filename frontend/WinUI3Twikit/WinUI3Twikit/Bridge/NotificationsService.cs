@@ -281,6 +281,7 @@ namespace WinUI3Twikit.Bridge
             {
                 ["id"] = quoted.Str("id") ?? quotedId ?? string.Empty,
                 ["text"] = quotedText,
+                ["urls"] = TweetSerializer.UrlEntities(quoted),
                 ["created_at"] = FormatTimestampMs(TimestampMsFromTwitter(quoted.Str("created_at") ?? string.Empty)),
                 ["user_name"] = user.Str("name") ?? "Unknown",
                 ["user_screen_name"] = user.Str("screen_name") ?? string.Empty,
@@ -594,6 +595,7 @@ namespace WinUI3Twikit.Bridge
                 ["id"] = tweetId,
                 ["type"] = type,
                 ["text"] = text,
+                ["urls"] = TweetSerializer.UrlEntities(tweet),
                 ["created_at"] = FormatTimestampMs(timestampMs),
                 ["target_tweet_text"] = string.Empty,
                 ["reply_count"] = TweetSerializer.MetricCount(tweet.Get("reply_count").AsLong()),

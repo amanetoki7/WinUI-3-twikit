@@ -235,6 +235,95 @@ namespace WinUI3Twikit.Bridge
             => token.StartsWith("https://t.co/", StringComparison.OrdinalIgnoreCase)
                || token.StartsWith("http://t.co/", StringComparison.OrdinalIgnoreCase);
 
+        /// <summary>本文中の t.co と展開後 URL の対応（リンク化に使う）。</summary>
+        public static JsonArray UrlEntities(Tweet tweet)
+        {
+            var urls = new JsonArray();
+            try
+            {
+                foreach (var entity in tweet.Urls)
+                {
+                    AppendUrlEntity(urls, entity.Url, entity.ExpandedUrl, entity.DisplayUrl);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"URL 抽出エラー: {ex.Message}");
+            }
+
+            return urls;
+        }
+
+        /// <summary>REST 形式のツイート（通知 API など）の <c>entities.urls</c> から同じ形を作る。</summary>
+        public static JsonArray UrlEntities(JsonObject tweet)
+        {
+            var urls = new JsonArray();
+            try
+            {
+                foreach (var entity in tweet.Sub("entities").ArrOrEmpty("urls").Objects())
+                {
+                    AppendUrlEntity(urls, entity.Str("url"), entity.Str("expanded_url"), entity.Str("display_url"));
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"URL 抽出エラー: {ex.Message}");
+            }
+
+            return urls;
+        }
+
+        private static void AppendUrlEntity(JsonArray urls, string? shortUrl, string? expandedUrl, string? displayUrl)
+        {
+            if (string.IsNullOrEmpty(shortUrl))
+            {
+                return;
+            }
+
+            urls.Add(new JsonObject
+            {
+                ["url"] = shortUrl,
+                ["expanded_url"] = expandedUrl ?? shortUrl,
+                ["display_url"] = displayUrl ?? string.Empty,
+            });
+        }
+
+        /// <summary>引用ツイートの URL（本文末尾の t.co）は引用カードで表示するため本文から外す。</summary>
+        private static string StripQuotedUrl(string text, Tweet tweet)
+        {
+            var quotedId = tweet.QuotedStatusId;
+            if (string.IsNullOrEmpty(quotedId) || string.IsNullOrEmpty(text))
+            {
+                return text;
+            }
+
+            try
+            {
+                foreach (var entity in tweet.Urls)
+                {
+                    var expanded = entity.ExpandedUrl ?? string.Empty;
+                    if (expanded.Contains($"/status/{quotedId}", StringComparison.OrdinalIgnoreCase)
+                        && !string.IsNullOrEmpty(entity.Url))
+                    {
+                        text = text.Replace(entity.Url, string.Empty);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"引用 URL 除去エラー: {ex.Message}");
+            }
+
+            return text.Trim();
+        }
+
+        /// <summary>返信先のスクリーンネーム（@ 無し）。返信でなければ null。</summary>
+        private static string? ReplyToScreenName(Tweet tweet)
+        {
+            var name = (tweet.Legacy.Str("in_reply_to_screen_name") ?? string.Empty).Trim().TrimStart('@');
+            return name.Length == 0 ? null : name;
+        }
+
         public static JsonObject QuoteToDict(Tweet quoted)
         {
             var user = quoted.User;
@@ -242,6 +331,7 @@ namespace WinUI3Twikit.Bridge
             {
                 ["id"] = quoted.Id,
                 ["text"] = NormalizeText(DisplayText(quoted)),
+                ["urls"] = UrlEntities(quoted),
                 ["created_at"] = FormatCreatedAt(quoted),
                 ["user_name"] = user?.Name ?? "Unknown",
                 ["user_screen_name"] = user?.ScreenName ?? string.Empty,
@@ -259,11 +349,19 @@ namespace WinUI3Twikit.Bridge
             var display = retweeted ?? tweet;
             var user = display.User;
 
+            var text = NormalizeText(DisplayText(display));
+            if (display.IsQuoteStatus)
+            {
+                text = StripQuotedUrl(text, display);
+            }
+
             var result = new JsonObject
             {
                 ["id"] = display.Id,
                 ["timeline_entry_id"] = tweet.Id,
-                ["text"] = NormalizeText(DisplayText(display)),
+                ["text"] = text,
+                ["urls"] = UrlEntities(display),
+                ["reply_to_screen_name"] = ReplyToScreenName(display),
                 ["created_at"] = FormatCreatedAt(display),
                 ["user_name"] = user?.Name ?? "Unknown",
                 ["user_screen_name"] = user?.ScreenName ?? string.Empty,

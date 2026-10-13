@@ -32,6 +32,17 @@ namespace WinUI3Twikit
             return ToNamedSize(url, "small");
         }
 
+        /// <summary>拡大表示用（name=large）。pbs.twimg.com の画像以外はそのまま返す。</summary>
+        public static string? ForPreview(string? url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return url;
+            }
+
+            return ToNamedSize(url, "large");
+        }
+
         private static string ToNamedSize(string url, string size)
         {
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))

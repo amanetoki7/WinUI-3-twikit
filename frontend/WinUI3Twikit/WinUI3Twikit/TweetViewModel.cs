@@ -30,6 +30,9 @@ namespace WinUI3Twikit
         public string? retweeted_by_screen_name { get; set; }
         public List<MediaItemDto>? media_items { get; set; }
         public QuotedTweetDto? quoted_tweet { get; set; }
+        public List<UrlEntityDto>? urls { get; set; }
+        public string? reply_to_screen_name { get; set; }
+        public bool is_pinned { get; set; }
     }
 
     public class QuotedTweetDto
@@ -43,6 +46,7 @@ namespace WinUI3Twikit
         public bool user_protected { get; set; }
         public bool user_verified { get; set; }
         public List<MediaItemDto>? media_items { get; set; }
+        public List<UrlEntityDto>? urls { get; set; }
         public bool is_unavailable { get; set; }
     }
 
@@ -60,7 +64,11 @@ namespace WinUI3Twikit
         public string Thumbnail { get; set; } = string.Empty;
         public ImageSource? ThumbnailImage { get; set; }
         public bool IsVideo => Type is "video" or "animated_gif";
+        public bool IsGif => Type == "animated_gif";
         public bool ShowVideoOverlay => IsVideo && !string.IsNullOrWhiteSpace(Thumbnail);
+
+        /// <summary>拡大表示用の URL。画像は高解像度（name=large）、動画 / GIF は mp4 の URL。</summary>
+        public string PreviewUrl => IsVideo ? Url : TwitterImageUrls.ForPreview(Url) ?? Url;
     }
 
     internal static class MediaItemMapper
@@ -90,6 +98,7 @@ namespace WinUI3Twikit
     {
         public string Id { get; set; } = string.Empty;
         public string Text { get; set; } = string.Empty;
+        public List<TweetUrlEntity> Urls { get; set; } = [];
         public string UserName { get; set; } = string.Empty;
         public string UserScreenName { get; set; } = string.Empty;
         public bool IsUserProtected { get; set; }
@@ -123,6 +132,24 @@ namespace WinUI3Twikit
         public bool IsUserProtected { get; set; }
         public bool IsUserVerified { get; set; }
         public bool IsRetweetEnabled => !IsUserProtected;
+
+        /// <summary>本文中の t.co と展開後 URL の対応（リンク化に使う）。</summary>
+        public List<TweetUrlEntity> Urls { get; set; } = [];
+
+        /// <summary>"@" を除いたスクリーンネーム。</summary>
+        public string UserScreenNameBare => UserScreenName.TrimStart('@');
+
+        /// <summary>返信先のスクリーンネーム（@ 無し）。返信でなければ空。</summary>
+        public string ReplyToScreenName { get; set; } = string.Empty;
+
+        /// <summary>プロフィールに固定されたツイート（ユーザーのツイート一覧の 1 ページ目）。</summary>
+        public bool IsPinned { get; set; }
+
+        /// <summary>x.com 上の URL（ブラウザで開く用）。</summary>
+        public string TweetUrl => string.IsNullOrEmpty(Id)
+            ? string.Empty
+            : $"https://x.com/{(UserScreenNameBare.Length > 0 ? UserScreenNameBare : "i")}/status/{Id}";
+
         public string CreatedAt { get; set; } = string.Empty;
         public string CreatedAtDisplay => TimeDisplayHelper.FormatDisplay(CreatedAt);
         public string CreatedAtAbsoluteDisplay => TimeDisplayHelper.FormatAbsoluteDisplay(CreatedAt);
@@ -146,6 +173,9 @@ namespace WinUI3Twikit
         public string RetweetHeaderText => IsRetweet
             ? $"{RetweetedByName}さんがリツイートしました"
             : string.Empty;
+
+        /// <summary>RT メニューの文言。RT 済みなら取り消し。</summary>
+        public string RetweetMenuText => IsRetweeted ? "リツイートを取り消す" : "リツイート";
 
         private bool _isReplying = false;
         public bool IsReplying
@@ -286,6 +316,9 @@ namespace WinUI3Twikit
                 IsRetweeted = dto.is_retweeted,
                 IsRetweet = dto.is_retweet,
                 RetweetedByName = dto.retweeted_by_name ?? string.Empty,
+                ReplyToScreenName = (dto.reply_to_screen_name ?? string.Empty).Trim().TrimStart('@'),
+                IsPinned = dto.is_pinned,
+                Urls = TweetUrlEntity.ListFromDto(dto.urls),
                 MediaItems = dto.media_items?
                     .Select(m => MediaItemMapper.FromDto(m, 640))
                     .ToList() ?? [],
@@ -325,6 +358,7 @@ namespace WinUI3Twikit
             {
                 Id = dto.id ?? string.Empty,
                 Text = dto.text ?? string.Empty,
+                Urls = TweetUrlEntity.ListFromDto(dto.urls),
                 UserName = dto.user_name ?? string.Empty,
                 UserScreenName = string.IsNullOrEmpty(dto.user_screen_name)
                     ? string.Empty
@@ -356,10 +390,11 @@ namespace WinUI3Twikit
         public void ToggleRetweet()
         {
             IsRetweeted = !IsRetweeted;
-            RetweetCount += IsRetweeted ? 1 : -1;
+            RetweetCount = Math.Max(0, RetweetCount + (IsRetweeted ? 1 : -1));
             OnPropertyChanged(nameof(IsRetweeted));
             OnPropertyChanged(nameof(RetweetCount));
             OnPropertyChanged(nameof(RetweetCountDisplay));
+            OnPropertyChanged(nameof(RetweetMenuText));
         }
 
         public void NoteReplyPosted()
@@ -442,6 +477,7 @@ namespace WinUI3Twikit
             {
                 Id = source.Id,
                 Text = source.Text,
+                Urls = source.Urls,
                 UserName = source.UserName,
                 UserScreenName = source.UserScreenName,
                 IsUserProtected = source.IsUserProtected,
