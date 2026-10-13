@@ -105,7 +105,7 @@
         <PublishAot>false</PublishAot>
         <ApplicationIcon>TwitterIcon48.ico</ApplicationIcon>
         <ApplicationManifest>app.manifest</ApplicationManifest>
-        <AssemblyName>WinUI 3  Twitter</AssemblyName>
-        <AssemblyTitle>WinUI 3  Twitter</AssemblyTitle>
+        <AssemblyName>WinUI 3 Twitter</AssemblyName>
+        <AssemblyTitle>WinUI 3 Twitter</AssemblyTitle>
     </PropertyGroup>
 </Project>
