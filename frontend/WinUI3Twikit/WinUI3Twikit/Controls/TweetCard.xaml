@@ -15,8 +15,34 @@
     </UserControl.Resources>
 
     <StackPanel>
-        <Border Margin="0,6" Padding="16" CornerRadius="12"
-                Background="{ThemeResource TweetCardBackgroundBrush}" BorderBrush="{ThemeResource TweetCardBorderBrush}" BorderThickness="1">
+        <!-- ホバー色と、会話ページで開いているツイートの枠。テーマごとの値は App.xaml の ThemeDictionaries を参照 -->
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="PointerStates">
+                <VisualState x:Name="Normal"/>
+                <VisualState x:Name="PointerOver">
+                    <VisualState.Setters>
+                        <Setter Target="CardBorder.Background" Value="{ThemeResource TweetCardHoverBackgroundBrush}"/>
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+            <VisualStateGroup x:Name="FocalStates">
+                <VisualState x:Name="NotFocal"/>
+                <VisualState x:Name="Focal">
+                    <VisualState.Setters>
+                        <Setter Target="CardBorder.BorderBrush" Value="{ThemeResource AccentFillColorDefaultBrush}"/>
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+
+        <!-- クリックで会話ページへ（ボタン・リンク・メディア・アイコン・引用はそれぞれの動作を優先） -->
+        <Border x:Name="CardBorder"
+                Margin="0,6" Padding="16" CornerRadius="12"
+                Background="{ThemeResource TweetCardBackgroundBrush}" BorderBrush="{ThemeResource TweetCardBorderBrush}" BorderThickness="1"
+                PointerEntered="CardBorder_PointerEntered"
+                PointerExited="CardBorder_PointerExited"
+                PointerCanceled="CardBorder_PointerExited"
+                PointerCaptureLost="CardBorder_PointerExited">
             <StackPanel Spacing="12">
                 <!-- プロフィールに固定されたツイート（ユーザーのツイート一覧の 1 ページ目） -->
                 <StackPanel Orientation="Horizontal" Spacing="6"
@@ -45,7 +71,7 @@
                     CreatedAtAbsoluteDisplay="{x:Bind Tweet.CreatedAtAbsoluteDisplay}"
                     CreatedAtRelativeDisplay="{x:Bind Tweet.CreatedAtRelativeDisplay}"
                     UserProfileImage="{x:Bind Tweet.UserProfileImage}"
-                    ReplyToScreenName="{x:Bind Tweet.ReplyToScreenName}"/>
+                    ReplyToScreenName="{x:Bind ReplyToFor(Tweet.ReplyToScreenName, ShowReplyTo)}"/>
 
                 <!-- URL / ハッシュタグ / メンションをリンク化。URL はブラウザ、# は検索、@ はプロフィール検索へ -->
                 <controls:TweetTextBlock Text="{x:Bind Tweet.Text}"

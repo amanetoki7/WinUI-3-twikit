@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.Linq;
 using System.Net;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Twikit;
 
 namespace WinUI3Twikit.Bridge
@@ -324,6 +326,75 @@ namespace WinUI3Twikit.Bridge
             return name.Length == 0 ? null : name;
         }
 
+        /// <summary>本文先頭の「@名前」の並び（空白区切り）だけでできているか。</summary>
+        private static readonly Regex LeadingMentions = new(@"^(?:@\w+\s*)+$");
+
+        private static readonly Regex Mention = new(@"@(\w+)");
+
+        /// <summary>
+        /// 返信で X が本文の先頭に自動で付ける「@名前」（<c>display_text_range</c> より前の部分）。
+        /// X の Web 版と同じく本文からは外し、返信先として表示する。返信でなければ空。
+        /// </summary>
+        /// <param name="tweet">ツイートの <c>legacy</c>、または REST 形式のツイート（通知 API など）。</param>
+        internal static string HiddenReplyPrefix(JsonObject tweet)
+        {
+            var fullText = tweet.Str("full_text");
+            var start = tweet.Arr("display_text_range").At(0).AsInt() ?? 0;
+            if (string.IsNullOrEmpty(fullText) || start <= 0)
+            {
+                return string.Empty;
+            }
+
+            // display_text_range はコードポイント単位。
+            var length = 0;
+            for (var codePoints = 0; codePoints < start && length < fullText.Length; codePoints++)
+            {
+                length += char.IsSurrogatePair(fullText, length) ? 2 : 1;
+            }
+
+            var prefix = fullText[..length];
+            return LeadingMentions.IsMatch(prefix) ? prefix : string.Empty;
+        }
+
+        /// <summary>本文の先頭から <see cref="HiddenReplyPrefix"/> を外す。先頭がそれと違えば本文はそのまま。</summary>
+        internal static string StripHiddenReplyPrefix(string text, string hiddenPrefix)
+        {
+            // 本文がメンションと画像だけだと、画像の URL を外したときに末尾の空白も消えているので空白抜きで比べる。
+            var mentions = hiddenPrefix.TrimEnd();
+            if (mentions.Length == 0
+                || !text.StartsWith(mentions, StringComparison.Ordinal)
+                || (text.Length > mentions.Length && !char.IsWhiteSpace(text[mentions.Length])))
+            {
+                return text;
+            }
+
+            return text[mentions.Length..].TrimStart();
+        }
+
+        /// <summary>
+        /// 返信先の表示用（@ 無し・空白区切り）。直接の返信先 <paramref name="replyTo"/> を先頭に、
+        /// 本文から外した「@名前」を続ける。返信でなければ null。
+        /// </summary>
+        internal static string? ReplyToScreenNames(string? replyTo, string hiddenPrefix)
+        {
+            var names = new List<string>();
+            if (!string.IsNullOrEmpty(replyTo))
+            {
+                names.Add(replyTo);
+            }
+
+            foreach (Match match in Mention.Matches(hiddenPrefix))
+            {
+                var name = match.Groups[1].Value;
+                if (!names.Contains(name, StringComparer.OrdinalIgnoreCase))
+                {
+                    names.Add(name);
+                }
+            }
+
+            return names.Count == 0 ? null : string.Join(" ", names);
+        }
+
         public static JsonObject QuoteToDict(Tweet quoted)
         {
             var user = quoted.User;
@@ -349,7 +420,8 @@ namespace WinUI3Twikit.Bridge
             var display = retweeted ?? tweet;
             var user = display.User;
 
-            var text = NormalizeText(DisplayText(display));
+            var hiddenReplyPrefix = HiddenReplyPrefix(display.Legacy);
+            var text = NormalizeText(StripHiddenReplyPrefix(DisplayText(display), hiddenReplyPrefix));
             if (display.IsQuoteStatus)
             {
                 text = StripQuotedUrl(text, display);
@@ -361,7 +433,7 @@ namespace WinUI3Twikit.Bridge
                 ["timeline_entry_id"] = tweet.Id,
                 ["text"] = text,
                 ["urls"] = UrlEntities(display),
-                ["reply_to_screen_name"] = ReplyToScreenName(display),
+                ["reply_to_screen_name"] = ReplyToScreenNames(ReplyToScreenName(display), hiddenReplyPrefix),
                 ["created_at"] = FormatCreatedAt(display),
                 ["user_name"] = user?.Name ?? "Unknown",
                 ["user_screen_name"] = user?.ScreenName ?? string.Empty,

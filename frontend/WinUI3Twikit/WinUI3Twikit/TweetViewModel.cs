@@ -139,7 +139,7 @@ namespace WinUI3Twikit
         /// <summary>"@" を除いたスクリーンネーム。</summary>
         public string UserScreenNameBare => UserScreenName.TrimStart('@');
 
-        /// <summary>返信先のスクリーンネーム（@ 無し）。返信でなければ空。</summary>
+        /// <summary>返信先のスクリーンネーム（@ 無し、複数なら空白区切り）。返信でなければ空。</summary>
         public string ReplyToScreenName { get; set; } = string.Empty;
 
         /// <summary>プロフィールに固定されたツイート（ユーザーのツイート一覧の 1 ページ目）。</summary>

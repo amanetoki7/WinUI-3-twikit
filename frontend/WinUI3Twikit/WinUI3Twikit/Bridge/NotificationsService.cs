@@ -445,7 +445,12 @@ namespace WinUI3Twikit.Bridge
                     ["type"] = AggregateType(notification),
                     ["text"] = TweetSerializer.NormalizeText(notification.Sub("message").Str("text") ?? string.Empty),
                     ["created_at"] = FormatTimestampMs(timestampMs),
-                    ["target_tweet_text"] = StripMediaUrls(TweetSerializer.NormalizeText(TweetText(target)), target),
+                    // いいね・リポストされた自分の返信も、先頭の自動の @名前は外す。
+                    ["target_tweet_text"] = StripMediaUrls(
+                        TweetSerializer.NormalizeText(
+                            TweetSerializer.StripHiddenReplyPrefix(TweetText(target), TweetSerializer.HiddenReplyPrefix(target))),
+                        target),
+                    ["target_tweet_id"] = targetId,
                 };
                 AddActor(item, users, userId);
                 extracted.Add((timestampMs, item));
@@ -576,12 +581,18 @@ namespace WinUI3Twikit.Bridge
             var isQuote = string.Equals(type, "quote", StringComparison.Ordinal);
             var timestampMs = TimestampMsFromTwitter(tweet.Str("created_at") ?? string.Empty);
             var user = users.Sub(tweet.Str("user_id_str") ?? string.Empty);
-            var replyTo = isReply ? ReplyToScreenName(tweet, users, tweets) : string.Empty;
-            var text = TweetSerializer.NormalizeText(TweetText(tweet));
-            if (isReply)
+            // 返信で X が本文の先頭に付ける @名前はタイムラインと同じく本文から外し、返信先に並べる
+            // （返信の通知に限らず、返信になっているメンション・引用も同じ）。
+            var hiddenReplyPrefix = TweetSerializer.HiddenReplyPrefix(tweet);
+            var replyTo = isReply || IsDirectReply(tweet) ? ReplyToScreenName(tweet, users, tweets) : string.Empty;
+            var text = TweetSerializer.NormalizeText(TweetSerializer.StripHiddenReplyPrefix(TweetText(tweet), hiddenReplyPrefix));
+            if (hiddenReplyPrefix.Length == 0 && replyTo.Length > 0)
             {
+                // display_text_range が無い応答では、直接の返信先 1 人分だけ外す。
                 text = StripLeadingReplyMention(text, replyTo);
             }
+
+            replyTo = TweetSerializer.ReplyToScreenNames(replyTo, hiddenReplyPrefix) ?? string.Empty;
 
             if (isQuote || HasRawQuote(tweet))
             {

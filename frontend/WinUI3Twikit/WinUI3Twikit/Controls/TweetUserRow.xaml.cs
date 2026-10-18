@@ -2,6 +2,8 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using System;
+using System.Linq;
 
 namespace WinUI3Twikit.Controls
 {
@@ -94,23 +96,28 @@ namespace WinUI3Twikit.Controls
                 typeof(TweetUserRow),
                 new PropertyMetadata(false));
 
+        /// <summary>返信先に並べる人数。超えた分は「他 N 人」にまとめる。</summary>
+        private const int MaxReplyToNames = 3;
+
         private static void OnReplyToScreenNameChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             var row = (TweetUserRow)d;
-            var name = (e.NewValue as string ?? string.Empty).Trim();
-            if (name.Length == 0)
+            var names = (e.NewValue as string ?? string.Empty)
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (names.Length == 0)
             {
                 row.ReplyToDisplay = string.Empty;
                 row.HasReplyTo = false;
                 return;
             }
 
-            if (!name.StartsWith('@'))
+            var display = string.Join(" ", names.Take(MaxReplyToNames).Select(name => name.StartsWith('@') ? name : "@" + name));
+            if (names.Length > MaxReplyToNames)
             {
-                name = "@" + name;
+                display += $" 他{names.Length - MaxReplyToNames}人";
             }
 
-            row.ReplyToDisplay = name;
+            row.ReplyToDisplay = display;
             row.HasReplyTo = true;
         }
 

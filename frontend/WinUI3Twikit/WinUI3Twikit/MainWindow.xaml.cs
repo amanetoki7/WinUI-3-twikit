@@ -307,6 +307,30 @@ namespace WinUI3Twikit
             _ = FinishProfileSearchLoadingAsync(searchTask);
         }
 
+        /// <summary>
+        /// ツイートカードのクリックから会話ページへ遷移する。会話はページごとに別の ViewModel で持ち、
+        /// ナビゲーション引数として渡すので、戻るボタンで前の会話や一覧へ戻れる。
+        /// </summary>
+        public void NavigateToConversation(string? tweetId)
+        {
+            var id = (tweetId ?? string.Empty).Trim();
+            if (id.Length == 0
+                || (ContentFrame.Content is ConversationPage page
+                    && string.Equals(page.ViewModel?.TweetId, id, StringComparison.Ordinal)))
+            {
+                return;
+            }
+
+            var viewModel = new ConversationViewModel(id);
+
+            // LoadAsync は最初の await 前に IsLoading をセットするので、ページは読み込み中の表示から始まる。
+            var loadTask = viewModel.LoadAsync();
+
+            ContentFrame.Navigate(typeof(ConversationPage), viewModel);
+
+            _ = FinishProfileSearchLoadingAsync(loadTask);
+        }
+
         // --- 画面上部の通知（AppNotifications → InfoBar） ---
         private readonly DispatcherTimer _infoBarTimer;
 
@@ -623,6 +647,8 @@ namespace WinUI3Twikit
             if (pageType == typeof(ProfileSearchPage)) return ("profilesearch", "プロフィール検索");
             if (pageType == typeof(MyProfilePage)) return ("myprofile", "プロフィール");
             if (pageType == typeof(SettingsPage)) return ("settings", "設定");
+            // 会話はメニューに無いので、ナビの選択は遷移元のまま残す。
+            if (pageType == typeof(ConversationPage)) return (string.Empty, "会話");
             return null;
         }
 

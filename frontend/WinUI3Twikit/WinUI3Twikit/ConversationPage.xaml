@@ -1,0 +1,139 @@
+<Page
+    x:Class="WinUI3Twikit.ConversationPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:WinUI3Twikit"
+    xmlns:controls="using:WinUI3Twikit.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Page.Resources>
+        <local:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+    </Page.Resources>
+
+    <Grid Padding="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- 見出し。左矢印でひとつ前の画面（一覧や前の会話）へ戻る -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="4" Margin="0,0,8,4" VerticalAlignment="Center">
+            <Button x:Name="BackButton"
+                    Click="BackButton_Click"
+                    Style="{StaticResource SubtleButtonStyle}"
+                    Padding="8"
+                    VerticalAlignment="Center"
+                    ToolTipService.ToolTip="戻る"
+                    AutomationProperties.Name="戻る">
+                <FontIcon Glyph="&#xE72B;" FontSize="16"/>
+            </Button>
+            <TextBlock Text="会話" FontSize="24" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- 読み込み中 -->
+        <ProgressRing Grid.Row="1"
+                      Width="60" Height="60"
+                      IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                      Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Center"/>
+
+        <!-- エラー -->
+        <TextBlock Grid.Row="1"
+                   Text="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+                   Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                   FontSize="15"
+                   TextWrapping="WrapWholeWords"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   Margin="24"
+                   Visibility="{x:Bind ViewModel.HasError, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+        <!-- 返信元の流れ → 開いたツイート → 返信 -->
+        <ListView Grid.Row="1"
+                  x:Name="ConversationListView"
+                  ItemsSource="{x:Bind ViewModel.Entries, Mode=OneWay}"
+                  SelectionMode="None"
+                  Padding="8"
+                  controls:TweetCard.HostActions="{x:Bind ViewModel, Mode=OneWay}"
+                  Visibility="{x:Bind ViewModel.IsContentVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+
+            <ListView.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <ItemsStackPanel/>
+                </ItemsPanelTemplate>
+            </ListView.ItemsPanel>
+
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="local:ConversationEntry">
+                    <Grid>
+                        <!--
+                          返信の連鎖をつなぐ線。カード間の余白（上下 6px ずつ）に引く。
+                          横位置はアイコンの中心（カードの枠 1 + 余白 16 + アイコンの半径 20 = 37）
+                        -->
+                        <Rectangle Width="2" Height="6"
+                                   Margin="36,0,0,0"
+                                   HorizontalAlignment="Left"
+                                   VerticalAlignment="Top"
+                                   Fill="{ThemeResource ConversationLineBrush}"
+                                   Visibility="{x:Bind HasLineAbove, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                        <Rectangle Width="2" Height="6"
+                                   Margin="36,0,0,0"
+                                   HorizontalAlignment="Left"
+                                   VerticalAlignment="Bottom"
+                                   Fill="{ThemeResource ConversationLineBrush}"
+                                   Visibility="{x:Bind HasLineBelow, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                        <!-- 返信の連鎖は線で表すので「返信先」は出さない -->
+                        <controls:TweetCard Tweet="{x:Bind Tweet}"
+                                            IsFocal="{x:Bind IsFocal}"
+                                            ShowReplyTo="False"
+                                            Visibility="{x:Bind IsTweet, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                        <!--
+                          表示できない返信元。削除・凍結などは X の説明文を出す。
+                          X が流れの途中から返しただけのときは、そのツイートの会話を開き直せば続きが出ることもある
+                        -->
+                        <Border Margin="0,6" Padding="16,10" CornerRadius="12"
+                                Background="{ThemeResource TweetCardInsetBackgroundBrush}"
+                                BorderBrush="{ThemeResource TweetCardBorderBrush}"
+                                BorderThickness="1"
+                                Visibility="{x:Bind IsMissing, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <TextBlock Text="{x:Bind MissingText}"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                           TextWrapping="WrapWholeWords"
+                                           VerticalAlignment="Center"/>
+                                <HyperlinkButton Grid.Column="1"
+                                                 Content="開く"
+                                                 Tag="{x:Bind MissingTweetId}"
+                                                 Click="OpenMissingTweet_Click"
+                                                 ToolTipService.ToolTip="このツイートの会話を開く"
+                                                 Visibility="{x:Bind CanOpenMissing, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                            </Grid>
+                        </Border>
+
+                        <StackPanel Margin="4,16,0,4"
+                                    Spacing="12"
+                                    Visibility="{x:Bind IsRepliesHeader, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock Text="返信" Style="{StaticResource BodyStrongTextBlockStyle}"/>
+                            <TextBlock Text="返信はありません"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       FontSize="15"
+                                       Visibility="{x:Bind ShowNoReplies, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                        </StackPanel>
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+
+            <ListView.Footer>
+                <ProgressRing Width="32" Height="32"
+                              Margin="0,16"
+                              IsActive="{x:Bind ViewModel.IsLoadingMore, Mode=OneWay}"
+                              Visibility="{x:Bind ViewModel.IsLoadingMore, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"/>
+            </ListView.Footer>
+        </ListView>
+    </Grid>
+</Page>

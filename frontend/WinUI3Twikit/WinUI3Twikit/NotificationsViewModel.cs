@@ -192,6 +192,7 @@ namespace WinUI3Twikit
                             ActorScreenName = dto.actor_screen_name ?? "",
                             CreatedAt = dto.created_at ?? "",
                             TargetTweetText = dto.target_tweet_text ?? "",
+                            TargetTweetId = dto.target_tweet_id ?? "",
                             IsActorProtected = dto.user_protected,
                             IsActorVerified = dto.user_verified,
                             ReplyToScreenName = dto.reply_to_screen_name ?? ""
@@ -382,6 +383,7 @@ namespace WinUI3Twikit
         public string? actor_profile_image { get; set; }
         public string? created_at { get; set; }
         public string? target_tweet_text { get; set; }
+        public string? target_tweet_id { get; set; }
         public int reply_count { get; set; }
         public int retweet_count { get; set; }
         public int favorite_count { get; set; }
@@ -412,6 +414,9 @@ namespace WinUI3Twikit
         public string CreatedAtAbsoluteDisplay => TimeDisplayHelper.FormatAbsoluteDisplay(CreatedAt);
         public string CreatedAtRelativeDisplay => TimeDisplayHelper.FormatRelativeDisplay(CreatedAt);
         public string TargetTweetText { get; set; } = string.Empty;
+
+        /// <summary>いいね・リポストされたツイートの ID（フォローなど対象が無ければ空）。</summary>
+        public string TargetTweetId { get; set; } = string.Empty;
         public bool IsActorProtected { get; set; }
         public bool IsActorVerified { get; set; }
         public string ReplyToScreenName { get; set; } = string.Empty;
@@ -421,6 +426,12 @@ namespace WinUI3Twikit
         public bool IsMention => string.Equals(Type, "mention", StringComparison.OrdinalIgnoreCase);
         public bool IsQuote => string.Equals(Type, "quote", StringComparison.OrdinalIgnoreCase);
         public bool IsTweetCard => IsReply || IsMention || IsQuote;
+
+        /// <summary>
+        /// クリックで会話を開くツイート。返信・メンション・引用はそのツイート、いいね・リポストは対象のツイート。
+        /// フォローなど対象が無ければ空（クリックしない）。
+        /// </summary>
+        public string ConversationTweetId => IsTweetCard ? Id : TargetTweetId;
         public bool ShowAggregateHeader => !IsTweetCard;
 
         /// <summary>返信・メンションの本文には付けない。いいね・リポスト・フォローだけ。</summary>

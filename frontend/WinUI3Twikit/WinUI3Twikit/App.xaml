@@ -21,6 +21,9 @@
                 <ResourceDictionary x:Key="Default">
                     <SolidColorBrush x:Key="TweetCardBackgroundBrush" Color="#1F1F1F"/>
                     <SolidColorBrush x:Key="TweetCardBorderBrush" Color="#2A2A2A"/>
+                    <SolidColorBrush x:Key="TweetCardHoverBackgroundBrush" Color="#242424"/>
+                    <SolidColorBrush x:Key="TweetCardHoverOverlayBrush" Color="#08FFFFFF"/>
+                    <SolidColorBrush x:Key="ConversationLineBrush" Color="#454545"/>
                     <SolidColorBrush x:Key="TweetCardInsetBackgroundBrush" Color="#252525"/>
                     <SolidColorBrush x:Key="QuotedTweetCardBackgroundBrush" Color="#1A1A1A"/>
                     <SolidColorBrush x:Key="QuotedTweetCardBorderBrush" Color="#2A2A2A"/>
@@ -33,6 +36,9 @@
                 <ResourceDictionary x:Key="Light">
                     <SolidColorBrush x:Key="TweetCardBackgroundBrush" Color="#FFFFFF"/>
                     <SolidColorBrush x:Key="TweetCardBorderBrush" Color="#E0E0E0"/>
+                    <SolidColorBrush x:Key="TweetCardHoverBackgroundBrush" Color="#F7F7F7"/>
+                    <SolidColorBrush x:Key="TweetCardHoverOverlayBrush" Color="#08000000"/>
+                    <SolidColorBrush x:Key="ConversationLineBrush" Color="#C8C8C8"/>
                     <SolidColorBrush x:Key="TweetCardInsetBackgroundBrush" Color="#F3F3F3"/>
                     <SolidColorBrush x:Key="QuotedTweetCardBackgroundBrush" Color="#F7F7F7"/>
                     <SolidColorBrush x:Key="QuotedTweetCardBorderBrush" Color="#E0E0E0"/>
@@ -45,6 +51,9 @@
                 <ResourceDictionary x:Key="HighContrast">
                     <SolidColorBrush x:Key="TweetCardBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}"/>
                     <SolidColorBrush x:Key="TweetCardBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}"/>
+                    <SolidColorBrush x:Key="TweetCardHoverBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}"/>
+                    <SolidColorBrush x:Key="TweetCardHoverOverlayBrush" Color="Transparent"/>
+                    <SolidColorBrush x:Key="ConversationLineBrush" Color="{ThemeResource SystemColorWindowTextColor}"/>
                     <SolidColorBrush x:Key="TweetCardInsetBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}"/>
                     <SolidColorBrush x:Key="QuotedTweetCardBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}"/>
                     <SolidColorBrush x:Key="QuotedTweetCardBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}"/>

@@ -69,6 +69,7 @@ namespace WinUI3Twikit.Bridge
             new("GET", ["search"], Search),
             new("GET", ["users", "{screen_name}"], UserProfile),
             new("GET", ["users", "{screen_name}", "tweets"], UserTweets),
+            new("GET", ["tweets", "{tweet_id}", "conversation"], Conversation),
         ];
 
         public static async Task<HttpResponseMessage> DispatchAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -373,6 +374,12 @@ namespace WinUI3Twikit.Bridge
                 return JsonResponses.Ok(new JsonObject { ["error"] = ex.Message, ["tweets"] = new JsonArray(), ["next_cursor"] = null });
             }
         }
+
+        // --- 会話（ツイート詳細） ---
+        private static async Task<HttpResponseMessage> Conversation(RouteContext ctx)
+            => JsonResponses.Ok(await ConversationService.GetConversationAsync(
+                ctx.Params["tweet_id"],
+                ctx.Query.GetString("cursor")).ConfigureAwait(false));
 
         // --- favicon（旧 API 互換） ---
         private static Task<HttpResponseMessage> Favicon(RouteContext ctx)

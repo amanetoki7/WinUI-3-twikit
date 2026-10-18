@@ -62,6 +62,8 @@
             <ListView.ItemTemplate>
                 <DataTemplate x:DataType="local:NotificationViewModel">
                     <StackPanel>
+                    <!-- クリックで会話ページへ（返信・メンション・引用はそのツイート、いいね・リポストは対象のツイート） -->
+                    <Grid controls:ConversationClick.TweetId="{x:Bind ConversationTweetId}">
                     <Border Margin="0,6" Padding="16" CornerRadius="12"
                             Background="{ThemeResource TweetCardBackgroundBrush}" BorderBrush="{ThemeResource TweetCardBorderBrush}" BorderThickness="1">
 
@@ -166,6 +168,14 @@
                                 Tweet="{x:Bind ActionTweet, Mode=OneWay}"/>
                         </StackPanel>
                     </Border>
+
+                    <!-- ホバー色（ツイートカードと同じ見た目になるよう、カードの上に薄く重ねる） -->
+                    <Border controls:ConversationClick.IsHoverOverlay="True"
+                            Margin="0,6" CornerRadius="12"
+                            Background="{ThemeResource TweetCardHoverOverlayBrush}"
+                            IsHitTestVisible="False"
+                            Opacity="0"/>
+                    </Grid>
 
                     <controls:TweetComposeForms
                         x:Name="ReplyCompose"
