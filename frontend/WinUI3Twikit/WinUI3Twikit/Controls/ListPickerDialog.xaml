@@ -1,0 +1,79 @@
+<ContentDialog
+    x:Class="WinUI3Twikit.Controls.ListPickerDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:WinUI3Twikit.Controls"
+    Title="リストをタブに追加"
+    PrimaryButtonText="追加"
+    CloseButtonText="キャンセル"
+    DefaultButton="Primary">
+
+    <Grid MinWidth="400" MinHeight="240">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TextBlock
+            Text="ホームのタブとして表示するリストを選んでください。作成したリストを先に、フォロー中のリストをその後に並べています。"
+            TextWrapping="Wrap"
+            Margin="0,0,0,8"
+            Style="{StaticResource CaptionTextBlockStyle}"
+            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+        <ProgressRing
+            x:Name="LoadingRing"
+            Grid.Row="1"
+            Width="32"
+            Height="32"
+            IsActive="True"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center" />
+
+        <TextBlock
+            x:Name="EmptyText"
+            Grid.Row="1"
+            Text="リストがありません。"
+            Visibility="Collapsed"
+            TextWrapping="Wrap"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+        <ListView
+            x:Name="ListsView"
+            Grid.Row="1"
+            MaxHeight="400"
+            SelectionMode="Single"
+            SelectionChanged="ListsView_SelectionChanged"
+            DoubleTapped="ListsView_DoubleTapped">
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="controls:ListPickerRow">
+                    <StackPanel Padding="0,6">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <TextBlock
+                                Text="{x:Bind Note}"
+                                Visibility="{x:Bind NoteVisibility}"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <TextBlock
+                            Text="{x:Bind MemberInfo}"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock
+                            Text="{x:Bind Description}"
+                            Visibility="{x:Bind DescriptionVisibility}"
+                            TextWrapping="Wrap"
+                            MaxLines="2"
+                            TextTrimming="CharacterEllipsis"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+    </Grid>
+</ContentDialog>

@@ -14,7 +14,6 @@ namespace WinUI3Twikit.Bridge
     internal static class TimelineService
     {
         private static readonly PageCursorStore<Tweet> TweetPages = new(capacity: 512);
-        private static readonly PageCursorStore<TwitterList> ListPages = new();
         /// <summary>スクリーンネーム → ユーザー ID と固定ツイート ID。固定は変わるので一定時間で取り直す。</summary>
         private sealed record ResolvedUser(string Id, HashSet<string> PinnedTweetIds, DateTime ResolvedAtUtc);
 
@@ -116,6 +115,12 @@ namespace WinUI3Twikit.Bridge
         }
 
         // --- リスト一覧 ---
+        /// <summary>
+        /// ログイン中ユーザーのリスト（作成したもの + フォロー中のもの）。
+        /// twikit の <c>GetListsAsync</c> と同じ ListManagementPageTimeline を読むが、所有者（<c>user_results</c>）は
+        /// <see cref="TwitterList"/> に残らないので応答から直接拾い、<c>owner_screen_name</c> / <c>is_owned</c> を付ける
+        /// （ホームのタブ追加で「作成したリスト」を先に並べるため）。
+        /// </summary>
         public static async Task<JsonObject> GetUserListsAsync(int count, string? cursor)
         {
             try
@@ -124,20 +129,66 @@ namespace WinUI3Twikit.Bridge
                 var client = TwikitSession.Client;
                 Debug.WriteLine($"リスト一覧取得中... count={count} cursor={Describe(cursor)}");
 
-                var (page, nextCursor) = await ListPages.FetchAsync(cursor, count, c => client.GetListsAsync(count, c)).ConfigureAwait(false);
+                var response = await client.Gql.ListManagementPaceTimelineAsync(count, cursor).ConfigureAwait(false);
 
-                var lists = new JsonArray();
-                foreach (var list in page)
+                // X は timeline の代わりに viewer の殻とエラー（code 214 など）を返すことがある
+                var errors = JsonExtensions.FatalErrors(response.Json, "entries");
+                if (errors is not null)
                 {
-                    lists.Add(new JsonObject
+                    throw new BridgeException(errors.ErrorMessage("リスト一覧を取得できませんでした"));
+                }
+
+                var me = await TryGetAuthenticatedScreenNameAsync().ConfigureAwait(false);
+                var lists = new JsonArray();
+                string? nextCursor = null;
+
+                if (response.Json.FirstDict("entries") is JsonArray entries && entries.Count > 0)
+                {
+                    // カーソルは先に読む。リストが 1 件も無いページでも終端とは限らない
+                    nextCursor = entries[^1].Sub("content").Str("value");
+
+                    // items[0] はピン留め、items[1] が作成した + フォロー中のリスト（twikit の GetListsAsync と同じ）
+                    var items = entries.FindDict("items");
+                    var cells = items.Count >= 2 ? items[1] as JsonArray : null;
+                    foreach (var cell in cells.Objects())
                     {
-                        ["id"] = list.Id,
-                        ["name"] = list.Name ?? string.Empty,
-                        ["description"] = list.Description ?? string.Empty,
-                        ["mode"] = list.Mode,
-                        ["member_count"] = list.MemberCount,
-                        ["subscriber_count"] = list.SubscriberCount,
-                    });
+                        var listData = cell.Sub("item").Sub("itemContent").Obj("list");
+                        if (listData is null)
+                        {
+                            continue;
+                        }
+
+                        TwitterList list;
+                        try
+                        {
+                            list = new TwitterList(client, listData);
+                        }
+                        catch (NotFoundException)
+                        {
+                            // X が解決できなかったリスト（ID だけの殻）
+                            continue;
+                        }
+
+                        var owner = listData.Sub("user_results").Sub("result");
+                        var ownerScreenName = owner.Sub("core").Str("screen_name") ?? owner.Sub("legacy").Str("screen_name");
+
+                        // 所有者が分からないときは、フォロー中でなければ自分のもの（作成したリストはフォローできない）
+                        var isOwned = ownerScreenName is not null && me is not null
+                            ? string.Equals(ownerScreenName, me, StringComparison.OrdinalIgnoreCase)
+                            : !list.Following;
+
+                        lists.Add(new JsonObject
+                        {
+                            ["id"] = list.Id,
+                            ["name"] = list.Name ?? string.Empty,
+                            ["description"] = list.Description ?? string.Empty,
+                            ["mode"] = list.Mode,
+                            ["member_count"] = list.MemberCount,
+                            ["subscriber_count"] = list.SubscriberCount,
+                            ["owner_screen_name"] = ownerScreenName,
+                            ["is_owned"] = isOwned,
+                        });
+                    }
                 }
 
                 Debug.WriteLine($"リスト {lists.Count} 件取得");
@@ -146,7 +197,21 @@ namespace WinUI3Twikit.Bridge
             catch (Exception ex)
             {
                 Debug.WriteLine($"リスト一覧取得エラー: {ex.Message}");
-                return new JsonObject { ["lists"] = new JsonArray(), ["next_cursor"] = null };
+                return new JsonObject { ["error"] = ex.Message, ["lists"] = new JsonArray(), ["next_cursor"] = null };
+            }
+        }
+
+        /// <summary>ログイン中ユーザーのスクリーンネーム。取れないときは null（リストの所有判定は Following に任せる）。</summary>
+        private static async Task<string?> TryGetAuthenticatedScreenNameAsync()
+        {
+            try
+            {
+                return await TwikitSession.GetAuthenticatedScreenNameAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"ログイン中ユーザー名の取得に失敗: {ex.Message}");
+                return null;
             }
         }
 

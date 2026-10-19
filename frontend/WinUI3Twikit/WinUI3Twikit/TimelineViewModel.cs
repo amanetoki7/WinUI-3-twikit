@@ -7,12 +7,28 @@ using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using WinUI3Twikit.Bridge;
 
 namespace WinUI3Twikit
 {
     public partial class TimelineViewModel : INotifyPropertyChanged, ITweetListActions
     {
         private const int DefaultTimelineFetchCount = 30;
+
+        /// <summary>
+        /// リストのタブのタイムライン種別は <c>list:リストID</c>。おすすめ（for_you）/ 最新（latest）と同じ仕組みで、
+        /// 種別ごとにツイート・カーソル・既読 ID・スクロール位置を持つ。
+        /// </summary>
+        private const string ListTimelineTypePrefix = "list:";
+
+        public static string ListTimelineType(string listId) => ListTimelineTypePrefix + listId;
+
+        public static bool IsListTimelineType(string? type)
+            => type is not null && type.StartsWith(ListTimelineTypePrefix, StringComparison.OrdinalIgnoreCase);
+
+        /// <summary><c>list:ID</c> から ID を取り出す。リストの種別でなければ null。</summary>
+        public static string? ListIdOf(string? type)
+            => IsListTimelineType(type) ? type![ListTimelineTypePrefix.Length..] : null;
 
         private readonly Dictionary<string, ObservableCollection<TweetViewModel>> _tweetsByType = new(StringComparer.OrdinalIgnoreCase);
 
@@ -101,6 +117,7 @@ namespace WinUI3Twikit
 
         public bool IsChronologicalTimeline => IsChronologicalType(CurrentTimelineType);
 
+        // 最新とリストは時系列（新しい順）。おすすめだけが API の並び
         private static bool IsChronologicalType(string? type)
             => !string.Equals(NormalizeTimelineType(type), "for_you", StringComparison.OrdinalIgnoreCase);
 
@@ -162,6 +179,56 @@ namespace WinUI3Twikit
             {
                 await LoadTweetsAsync();
             }
+        }
+
+        // ==================== リストのタブ ====================
+
+        /// <summary>ホームのタブとして追加したリスト（タブの並び順）。起動時に data/home_tabs.json から復元する。</summary>
+        public ObservableCollection<HomeListTab> ListTabs { get; } = new(HomeTabsStore.Load());
+
+        public HomeListTab? FindListTab(string listId)
+            => ListTabs.FirstOrDefault(t => string.Equals(t.ListId, listId, StringComparison.Ordinal));
+
+        /// <summary>リストをタブに追加して保存する。追加済みならそのタブを返す（タブは増やさない）。</summary>
+        public HomeListTab AddListTab(string listId, string name)
+        {
+            if (FindListTab(listId) is { } existing)
+            {
+                return existing;
+            }
+
+            var tab = new HomeListTab { ListId = listId, Name = name };
+            ListTabs.Add(tab);
+            HomeTabsStore.Save(ListTabs);
+            return tab;
+        }
+
+        /// <summary>
+        /// タブを閉じる。保持していたツイート・カーソル・スクロール位置も捨てる。
+        /// 閉じたタブを表示中だったときはおすすめへ戻す（ページ側は TabView の選択をこれに合わせる）。
+        /// </summary>
+        public void RemoveListTab(string listId)
+        {
+            if (FindListTab(listId) is not { } tab)
+            {
+                return;
+            }
+
+            ListTabs.Remove(tab);
+            HomeTabsStore.Save(ListTabs);
+
+            var type = tab.TimelineType;
+            if (string.Equals(CurrentTimelineType, type, StringComparison.OrdinalIgnoreCase))
+            {
+                CurrentTimelineType = "for_you";
+                OnPropertyChanged(nameof(Tweets));
+            }
+
+            _tweetsByType.Remove(type);
+            _tweetCountsByType.Remove(type);
+            _seenTweetIdsByType.Remove(type);
+            _nextCursorByType.Remove(type);
+            _scrollAnchorByTimelineType.Remove(type);
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -362,7 +429,11 @@ namespace WinUI3Twikit
         private async Task<(List<TweetDto> TweetList, string? NextCursor)> FetchTimelinePageAsync(string timelineType, string? cursor)
         {
             var type = NormalizeTimelineType(timelineType);
-            var url = $"http://localhost:8000/timeline?pages=1&count={DefaultTimelineFetchCount}&type={Uri.EscapeDataString(type)}";
+
+            // リストのタブはリストのタイムライン（GET /lists/{id}/tweets）。応答の形は /timeline と同じ
+            var url = ListIdOf(type) is { } listId
+                ? $"http://localhost:8000/lists/{Uri.EscapeDataString(listId)}/tweets?count={DefaultTimelineFetchCount}"
+                : $"http://localhost:8000/timeline?pages=1&count={DefaultTimelineFetchCount}&type={Uri.EscapeDataString(type)}";
             if (!string.IsNullOrWhiteSpace(cursor))
             {
                 url += $"&cursor={Uri.EscapeDataString(cursor)}";

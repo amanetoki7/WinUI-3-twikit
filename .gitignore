@@ -245,6 +245,7 @@ orleans.codegen.cs
 __pycache__/
 *.py[cod]
 data/cookies.json
+data/home_tabs.json
 *.cookies*.json
 
 # Local terminal output and backup helpers

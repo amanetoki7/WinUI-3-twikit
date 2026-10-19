@@ -70,16 +70,21 @@
             </StackPanel>
         </StackPanel>
 
-        <!-- 2. タブ（おすすめ / 最新） -->
-        <TabView x:Name="TimelineTabView" 
-                 TabWidthMode="SizeToContent" 
-                 SelectedIndex="0" 
+        <!-- 2. タブ（おすすめ / 最新 + 追加したリスト）。「+」で自分のリストをタブに追加する（リストのタブは閉じられる）。
+             選択はコードビハインドが ViewModel の種別に合わせる（SelectedIndex は指定しない） -->
+        <TabView x:Name="TimelineTabView"
+                 TabWidthMode="SizeToContent"
                  SelectionChanged="TimelineTabView_SelectionChanged"
+                 AddTabButtonClick="TimelineTabView_AddTabButtonClick"
+                 TabCloseRequested="TimelineTabView_TabCloseRequested"
+                 Loaded="TimelineTabView_Loaded"
+                 CanDragTabs="False"
+                 CanReorderTabs="False"
                  Margin="12,1,12,4"
                  Grid.Row="1">
             <TabView.TabItems>
-                <TabViewItem Header="おすすめ" Tag="for_you" />
-                <TabViewItem Header="最新" Tag="latest" />
+                <TabViewItem Header="おすすめ" Tag="for_you" IsClosable="False" />
+                <TabViewItem Header="最新" Tag="latest" IsClosable="False" />
             </TabView.TabItems>
         </TabView>
 

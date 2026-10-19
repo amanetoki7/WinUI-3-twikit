@@ -19,6 +19,13 @@ namespace WinUI3Twikit
         public string Mode { get; set; } = string.Empty;
         public int MemberCount { get; set; }
         public int SubscriberCount { get; set; }
+
+        /// <summary>リストの所有者（@ なし）。ブリッジが判定できなかったときは空。</summary>
+        public string OwnerScreenName { get; set; } = string.Empty;
+
+        /// <summary>ログイン中のユーザーが作成したリストか（false はフォロー中のリスト）。</summary>
+        public bool IsOwned { get; set; } = true;
+
         public string MemberInfo => $"{MemberCount} メンバー · {SubscriberCount} 購読者";
     }
 
@@ -142,27 +149,9 @@ namespace WinUI3Twikit
 
             try
             {
-                var url = $"http://localhost:8000/lists?count={DefaultListFetchCount}";
-                var response = await _httpClient.GetAsync(url);
-                response.EnsureSuccessStatusCode();
-
-                var json = await response.Content.ReadAsStringAsync();
-                var payload = JsonSerializer.Deserialize<ListsApiResponse>(json);
-
-                if (payload?.lists != null)
+                foreach (var list in await FetchListsAsync(_httpClient))
                 {
-                    foreach (var dto in payload.lists)
-                    {
-                        Lists.Add(new ListItemViewModel
-                        {
-                            Id = dto.id ?? string.Empty,
-                            Name = dto.name ?? string.Empty,
-                            Description = dto.description ?? string.Empty,
-                            Mode = dto.mode ?? string.Empty,
-                            MemberCount = dto.member_count,
-                            SubscriberCount = dto.subscriber_count,
-                        });
-                    }
+                    Lists.Add(list);
                 }
             }
             catch (Exception ex)
@@ -173,6 +162,42 @@ namespace WinUI3Twikit
             {
                 IsLoading = false;
             }
+        }
+
+        /// <summary>
+        /// GET /lists（作成したリスト + フォロー中のリスト）を読む。リストページとホームのタブ追加ダイアログで共用。
+        /// ブリッジがエラーを返したときはそのメッセージで <see cref="InvalidOperationException"/>。
+        /// </summary>
+        public static async Task<List<ListItemViewModel>> FetchListsAsync(HttpClient httpClient, int count = DefaultListFetchCount)
+        {
+            var url = $"http://localhost:8000/lists?count={count}";
+            var response = await httpClient.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync();
+            var payload = JsonSerializer.Deserialize<ListsApiResponse>(json);
+            if (payload?.error is { } error && !string.IsNullOrWhiteSpace(error))
+            {
+                throw new InvalidOperationException(error);
+            }
+
+            var lists = new List<ListItemViewModel>();
+            foreach (var dto in payload?.lists ?? [])
+            {
+                lists.Add(new ListItemViewModel
+                {
+                    Id = dto.id ?? string.Empty,
+                    Name = dto.name ?? string.Empty,
+                    Description = dto.description ?? string.Empty,
+                    Mode = dto.mode ?? string.Empty,
+                    MemberCount = dto.member_count,
+                    SubscriberCount = dto.subscriber_count,
+                    OwnerScreenName = dto.owner_screen_name ?? string.Empty,
+                    IsOwned = dto.is_owned ?? true,
+                });
+            }
+
+            return lists;
         }
 
         public async Task SelectListAsync(string listId, string listName)
@@ -346,6 +371,7 @@ namespace WinUI3Twikit
         {
             public List<ListDto>? lists { get; set; }
             public string? next_cursor { get; set; }
+            public string? error { get; set; }
         }
 
         private sealed class ListDto
@@ -356,6 +382,8 @@ namespace WinUI3Twikit
             public string? mode { get; set; }
             public int member_count { get; set; }
             public int subscriber_count { get; set; }
+            public string? owner_screen_name { get; set; }
+            public bool? is_owned { get; set; }
         }
 
         private sealed class ListTimelineApiResponse

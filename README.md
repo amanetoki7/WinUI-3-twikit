@@ -15,7 +15,7 @@ WinUI 3 で動作する X（旧 Twitter）クライアントです。X との通
 | 画面 | 機能 |
 |---|---|
 | ツイート | テキスト投稿（画像・動画のメディア添付可） |
-| ホーム | おすすめ / 最新タイムライン、自動更新、無限スクロール、いいね・リツイート（取り消し可）・返信・引用、ブラウザで開く |
+| ホーム | おすすめ / 最新タイムライン、自動更新、無限スクロール、いいね・リツイート（取り消し可）・返信・引用、ブラウザで開く。タブの「+」で自分のリスト（作成したリストを先に、フォロー中のリストをその後に表示）をタブとして追加。リストのタブは × で閉じるまで残り、構成は `data/home_tabs.json` に保存されて次回起動時も復元 |
 | 検索 | ツイート検索、追加読み込み |
 | 通知 | 通知一覧。クリックで会話ページへ（返信・メンション・引用はそのツイート、いいね・リポストは対象のツイート） |
 | リスト | リスト一覧の表示、各リストのタイムライン閲覧 |
@@ -128,7 +128,8 @@ WinUI-3-twikit/
 │   └── WinUI3Twikit (Package)/     # MSIX パッケージ
 ├── twikit-dotnet/          # git submodule（amanetoki7/twikit-dotnet。src/Twikit/Twikit.csproj を参照）
 ├── data/
-│   └── cookies.example.json  # 認証情報テンプレート
+│   ├── cookies.example.json  # 認証情報テンプレート
+│   └── home_tabs.json        # ホームに追加したリストのタブ（アプリが自動生成。cookies.json と同じフォルダー）
 └── static/                 # favicon 等
 ```
 
@@ -141,7 +142,7 @@ ViewModel が使う URL は以前の FastAPI 版と同じです。実装は `Bri
 | `GET` | `/timeline` | おすすめ / 最新タイムライン |
 | `GET` | `/search` | ツイート検索 |
 | `GET` | `/notifications` | 通知一覧 |
-| `GET` | `/lists` | リスト一覧 |
+| `GET` | `/lists` | リスト一覧（作成したもの + フォロー中のもの。所有者 `owner_screen_name` と `is_owned` 付き） |
 | `GET` | `/lists/{list_id}/tweets` | リストのタイムライン |
 | `GET` | `/profile` | ログイン中アカウントのプロフィール |
 | `GET` | `/profile/tweets` | ログイン中アカウントのツイート |
@@ -276,6 +277,7 @@ git push origin v1.0.0
 - 開発環境: Visual Studio 2026 + .NET 8 SDK で動作確認済み
 - twikit-dotnet は [amanetoki7/twikit-dotnet](https://github.com/amanetoki7/twikit-dotnet) をプロジェクト参照で使用（`WinUI3Twikit.csproj` の `TwikitDotnetDir` プロパティ。既定は `..\..\..\..\twikit-dotnet\`）
 - cookie ファイルのパスは環境変数 `COOKIES_FILE` で変更できます（デフォルト: `data/cookies.json`）
+- ホームに追加したリストのタブは cookie ファイルと同じフォルダーの `home_tabs.json` に保存されます（`Bridge/HomeTabsStore.cs`。リストの ID と名前だけ）
 - `/profile` は `account/settings.json` が返すログイン中の `screen_name` を `UserByScreenName` に渡して取得します（`Bridge/TwikitSession.cs`）。ユーザー名の定数は不要です。`Client.UserAsync()` が使う `UserByRestId` は Cloudflare に 403 で拒否されるため使いません。`X_DISPLAY_NAME`、`X_SCREEN_NAME`、`X_PROFILE_IMAGE_URL` は、プロフィール取得前の表示や取得できないデータの任意フォールバックとしてのみ使用できます。
 - WinUI 3 からリポジトリを検出できない場合は、環境変数 `WINUI3TWIKIT_ROOT` にリポジトリルートを指定してください
 - フロントエンドは Windows App SDK 2.2 / .NET 8 を使用（[frontend/WinUI3Twikit/WinUI3Twikit/WinUI3Twikit.csproj](frontend/WinUI3Twikit/WinUI3Twikit/WinUI3Twikit.csproj)）

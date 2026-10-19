@@ -92,6 +92,10 @@ namespace WinUI3Twikit.Bridge
             }
         }
 
+        /// <summary>ホームのタブ構成 <c>home_tabs.json</c>。<see cref="CookiesPath"/> と同じフォルダーに置く。</summary>
+        public static string HomeTabsPath
+            => Path.Combine(Path.GetDirectoryName(CookiesPath) ?? ExecutableDirectory, "home_tabs.json");
+
         /// <summary><c>static/favicon.ico</c>（旧 API の <c>/favicon.ico</c> 用）。</summary>
         public static string? FaviconPath
             => RepositoryRoot is { } root ? Path.Combine(root, "static", "favicon.ico") : null;
